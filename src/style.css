@@ -233,6 +233,7 @@
 .agent-dashboard-active .agent-sidebar nav button{min-height:48px;padding:0 15px;border-radius:11px;color:#d7e1f2;font-size:13px}
 .agent-dashboard-active .agent-sidebar nav button:hover,.agent-dashboard-active .agent-sidebar nav button.active{background:linear-gradient(100deg,#3475f6,#7139e5);color:#fff}
 .agent-dashboard-active .agent-sidebar-logout{min-height:46px;margin-top:14px;border-radius:11px;background:#fff;color:#6d28d9;font-size:13px}
+.agent-dashboard-active .agent-sidebar-logout{width:min(100%,220px);align-self:center;justify-content:center}
 .agent-dashboard-active .agent-main{width:min(1450px,100%);padding:32px clamp(24px,5vw,58px) 46px}
 .agent-dashboard-active .agent-main-head{align-items:center;padding:0 0 21px;border:0}
 .agent-dashboard-active .agent-main-head h1{margin:0;color:#f6f8ff;font-size:31px}
@@ -293,6 +294,26 @@
 .agent-dashboard-active .agent-user-summary .agent-referral-id{background:#ffffff12}
 @media(max-width:850px){.agent-sidebar .agent-user-summary,.agent-dashboard-active .agent-user-summary{display:grid;grid-template-columns:42px minmax(0,1fr);margin:0 0 10px;padding:10px}.agent-sidebar .agent-avatar,.agent-dashboard-active .agent-avatar{width:40px;height:40px;grid-row:1 / span 2}.agent-sidebar nav,.agent-dashboard-active .agent-sidebar nav{align-items:stretch;gap:8px}.agent-nav-group{display:flex;align-items:center;gap:4px;flex:none}.agent-nav-heading{display:none}.agent-sidebar nav button{min-height:38px;padding:0 11px}.agent-sidebar .agent-user-summary .agent-sidebar-email{grid-column:2;padding:0}.agent-dashboard-active .agent-sidebar-logout{top:11px;right:14px}}
 @media(max-width:540px){.agent-brand-mark{font-size:15px!important}.agent-dashboard-active .agent-brand-mark{padding-right:120px}.agent-sidebar .agent-user-summary,.agent-dashboard-active .agent-user-summary{grid-template-columns:38px minmax(0,1fr);gap:3px 9px}.agent-sidebar .agent-avatar,.agent-dashboard-active .agent-avatar{width:36px;height:36px}.agent-sidebar .agent-profile-meta b{font-size:11px}.agent-sidebar nav button{font-size:11px}.agent-sidebar-logout{font-size:11px}}
+
+/* Mobile agent navigation opens as a full labeled sidebar drawer. */
+.agent-mobile-menu{display:none}
+@media(max-width:850px){
+ .agent-mobile-menu{width:40px;height:40px;flex:none;display:grid;place-items:center;border:1px solid #ffffff35;border-radius:11px;background:#ffffff12;color:#fff;cursor:pointer}
+ .agent-dashboard-active .agent-sidebar{position:fixed;z-index:1001;top:0;left:0;width:min(300px,86vw);height:100dvh;max-height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding:22px 17px 18px;transform:translateX(-105%);transition:transform .22s ease;box-shadow:18px 0 45px #07132650}
+ .agent-dashboard-active .agent-sidebar.mobile-open{transform:translateX(0)}
+ .agent-dashboard-active .agent-brand-mark{padding:5px 8px 18px}
+ .agent-dashboard-active .agent-user-summary{display:grid;grid-template-columns:42px minmax(0,1fr);margin:0 0 12px;padding:12px}
+ .agent-dashboard-active .agent-avatar{width:40px;height:40px}
+ .agent-dashboard-active .agent-sidebar nav{display:grid;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin:8px 0 0;gap:10px;padding:0 4px 8px 0}
+ .agent-dashboard-active .agent-nav-group{display:grid;align-items:initial;gap:3px}
+ .agent-dashboard-active .agent-nav-heading{display:block}
+ .agent-dashboard-active .agent-sidebar nav button{flex:none;width:100%;min-height:42px;padding:0 13px}
+ .agent-dashboard-active .agent-sidebar-logout{position:static;right:auto;top:auto;width:min(100%,220px);min-height:46px;margin:12px auto 0;padding:0 14px;align-self:center;justify-content:center}
+ .agent-sidebar-backdrop{position:fixed;z-index:1000;inset:0;border:0;background:#07132680;backdrop-filter:blur(2px)}
+ .agent-dashboard-active .agent-main{width:100%;min-width:0;padding:18px 14px 30px}
+ .agent-dashboard-active .agent-main-head{justify-content:flex-start;gap:12px}
+ .agent-dashboard-active .agent-main-head>div:first-of-type{flex:1;min-width:0}
+}
 
 /* Bundle purchasing inside the Agent Dashboard workspace. */
 .agent-buy-shop{width:100%;padding:clamp(18px,3vw,34px);border:1px solid #e2e7ef;border-radius:20px;background:#fff;box-shadow:0 10px 30px #16233b0a;color:#15243a}
