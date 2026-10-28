@@ -53,7 +53,7 @@ export default function Storefront({bundles,bundlePriceOverrides,updates,loading
  </div>
 }
 
-export function AgentBuyDataPanel({bundles,balance,orders,loading,onBack,onChoose,onBulkOrder}:{bundles:Bundle[];balance:number;orders:Array<{network:string;bundle:string;date:string;status:string}>;loading:boolean;onBack:()=>void;onChoose:(bundle:Bundle)=>void;onBulkOrder:(bundle:Bundle,phones:string[])=>Promise<{success:number;failed:number}>}){
+export function AgentBuyDataPanel({bundles,balance,orders,loading,onBack,showBack=true,onChoose,onBulkOrder}:{bundles:Bundle[];balance:number;orders:Array<{network:string;bundle:string;date:string;status:string}>;loading:boolean;onBack:()=>void;showBack?:boolean;onChoose:(bundle:Bundle)=>void;onBulkOrder:(bundle:Bundle,phones:string[])=>Promise<{success:number;failed:number}>}){
  const [category,setCategory]=useState('mtn');
  const [mode,setMode]=useState<'single'|'bulk'>('single');
  const [numbers,setNumbers]=useState('');
@@ -78,7 +78,7 @@ export function AgentBuyDataPanel({bundles,balance,orders,loading,onBack,onChoos
   try{const result=await onBulkOrder(chosen,phones);setMessage(`${result.success} order${result.success===1?'':'s'} submitted${result.failed?`; ${result.failed} failed`:''}. Check Transaction History for status.`);if(result.success===phones.length){setNumbers('');setChosen(null)}}catch{setMessage('Bulk order could not be completed. Check Transaction History before retrying.')}finally{setBusy(false)}
  }
  return <section className="agent-buy-shop">
-  <div className="agent-buy-title"><div><span>AGENT WORKSPACE</span><h1>Buy Data Bundles</h1></div><button onClick={onBack}><ArrowLeft size={16}/> Back to Dashboard</button></div>
+  <div className="agent-buy-title"><div><span>AGENT WORKSPACE</span><h1>Buy Data Bundles</h1></div>{showBack&&<button onClick={onBack}><ArrowLeft size={16}/> Back to Dashboard</button>}</div>
   <div className="agent-latest-order">{latest?<><b>Latest {latest.network} successful order</b><span>{latest.bundle} · placed {latest.date}</span><small>Order completed successfully.</small></>:<><b>No successful orders yet</b><span>Your completed data orders will appear here.</span></>}</div>
   <div className="agent-wallet-strip"><span>Wallet Balance</span><strong>{currency(balance)}</strong></div>
   <div className="agent-buy-modes" role="tablist" aria-label="Order mode"><button className={mode==='single'?'active':''} onClick={()=>setMode('single')}>Single Order</button><button className={mode==='bulk'?'active':''} onClick={()=>setMode('bulk')}>Bulk Orders</button></div>
