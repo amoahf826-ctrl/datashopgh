@@ -6,7 +6,6 @@ body,
   max-width: 100%;
 }
 
-.dashboard-back,
 .agent-back-button,
 .admin-back-button {
   display: inline-flex;
@@ -23,7 +22,6 @@ body,
   white-space: nowrap;
   cursor: pointer;
 }
-.dashboard-back:hover,
 .agent-back-button:hover,
 .admin-back-button:hover { background: #f4f6f9; }
 .agent-back-button { flex: none; }
@@ -80,7 +78,6 @@ body,
 @media (max-width: 720px) {
   .dashboard-page { padding: 0 16px 30px; }
   .dashboard-top { height: 82px; margin: 0 -16px 16px; padding: 0 14px; gap: 10px; }
-  .dashboard-back { min-height: 34px; padding-inline: 8px; font-size: 10px; }
   .dashboard-menu { width: 38px; height: 38px; flex: none; }
   .dashboard-title h1 { font-size: 24px; }
   .dashboard-title p { font-size: 11px; }
@@ -175,10 +172,18 @@ body,
   .admin-heading { grid-column: 3; grid-row: 1; }
   .admin-avatar { grid-column: 4; grid-row: 1; }
   .admin-role-badge { grid-column: 1 / 3; grid-row: 2; justify-self: start; padding: 7px 9px; font-size: 9px; }
-  .admin-topbar>.admin-refresh-button:nth-of-type(3),
-  .admin-topbar>.admin-refresh-button:nth-of-type(4) { min-height: 38px; padding: 0 8px; font-size: 10px; }
-  .admin-topbar>.admin-refresh-button:nth-of-type(3) { grid-column: 3; grid-row: 2; }
-  .admin-topbar>.admin-refresh-button:nth-of-type(4) { grid-column: 4; grid-row: 2; }
+  .admin-topbar:not(.admin-overview-topbar)>.admin-refresh-button:nth-of-type(3),
+  .admin-topbar:not(.admin-overview-topbar)>.admin-refresh-button:nth-of-type(4),
+  .admin-overview-topbar>.admin-refresh-button:nth-of-type(2),
+  .admin-overview-topbar>.admin-refresh-button:nth-of-type(3) { min-height: 38px; padding: 0 8px; font-size: 10px; }
+  .admin-topbar:not(.admin-overview-topbar)>.admin-refresh-button:nth-of-type(3) { grid-column: 3; grid-row: 2; }
+  .admin-topbar:not(.admin-overview-topbar)>.admin-refresh-button:nth-of-type(4) { grid-column: 4; grid-row: 2; }
+  .admin-overview-topbar { grid-template-columns: 38px minmax(0, 1fr) 38px; }
+  .admin-overview-topbar .admin-heading { grid-column: 2; grid-row: 1; }
+  .admin-overview-topbar .admin-avatar { grid-column: 3; grid-row: 1; }
+  .admin-overview-topbar .admin-role-badge { grid-column: 1; grid-row: 2; }
+  .admin-overview-topbar>.admin-refresh-button:nth-of-type(2) { grid-column: 2; grid-row: 2; }
+  .admin-overview-topbar>.admin-refresh-button:nth-of-type(3) { grid-column: 3; grid-row: 2; }
   .admin-metric { min-width: 0; min-height: 132px; padding: 13px 11px; }
   .admin-metric-label { font-size: 8px; }
   .admin-metric-icon { width: 34px; height: 34px; }
@@ -189,8 +194,8 @@ body,
 }
 
 @media (max-width: 360px) {
-  .dashboard-back { font-size: 9px; gap: 3px; padding-inline: 6px; }
   .admin-topbar { grid-template-columns: 34px 48px minmax(0, 1fr) 34px; padding-inline: 9px; gap: 6px; }
+  .admin-overview-topbar { grid-template-columns: 34px minmax(0, 1fr) 34px; }
   .admin-back-button { font-size: 9px; gap: 3px; }
   .dashboard-shortcuts { gap: 6px; }
   .dashboard-shortcuts>button { height: 80px; }
