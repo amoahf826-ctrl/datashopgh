@@ -1,0 +1,11 @@
+node_modules/
+dist/
+netlify-deploy.zip
+.env
+.env.*
+!.env.example
+.npm-cache/
+.supabase/
+.supabase-home/
+supabase/.temp/
+*.tsbuildinfo

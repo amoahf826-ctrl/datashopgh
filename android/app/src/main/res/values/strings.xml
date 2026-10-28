@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DataShopGH</string>
+    <string name="title_activity_main">DataShopGH</string>
+    <string name="package_name">com.wittytechnologies.datashopgh</string>
+    <string name="custom_url_scheme">com.wittytechnologies.datashopgh</string>
+</resources>
