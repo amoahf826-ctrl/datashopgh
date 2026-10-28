@@ -1,0 +1,171 @@
+/* Shared responsive rules for customer, agent, and admin workspaces. */
+html,
+body,
+#root {
+  min-height: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 1200px) {
+  .dashboard-wrap { max-width: 1160px; }
+  .dashboard-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .agent-portal.agent-dashboard-active { grid-template-columns: 286px minmax(0, 1fr); }
+  .admin-content { padding-inline: clamp(24px, 3vw, 48px); }
+}
+
+@media (min-width: 851px) and (max-width: 1199px) {
+  .dashboard-wrap { max-width: 100%; }
+  .dashboard-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .agent-portal.agent-dashboard-active { grid-template-columns: 250px minmax(0, 1fr); }
+  .agent-dashboard-active .agent-main { padding-inline: 24px; }
+  .agent-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .agent-dashboard-active .agent-quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+}
+
+@media (max-width: 850px) {
+  body { overflow-x: hidden; }
+  .dashboard-page,
+  .dashboard-outer,
+  .admin-layout,
+  .agent-portal { width: 100%; min-width: 0; }
+  .dashboard-wrap,
+  .agent-main,
+  .admin-workspace { width: 100%; min-width: 0; }
+  .dashboard-wrap { max-width: 100%; }
+  .dashboard-top { min-width: 0; }
+  .dashboard-title { min-width: 0; }
+  .dashboard-title h1 { overflow-wrap: anywhere; }
+  .dashboard-balance,
+  .dashboard-recent,
+  .agent-balance-card,
+  .agent-order-panel,
+  .agent-tool-panel,
+  .admin-card { min-width: 0; }
+  .dashboard-order { min-width: 0; }
+  .dashboard-order>div { min-width: 0; }
+  .admin-topbar { min-width: 0; flex-wrap: wrap; }
+  .admin-heading { min-width: 0; }
+  .admin-content { min-width: 0; }
+  .admin-overview-grid { grid-template-columns: minmax(0, 1.6fr) minmax(220px, 1fr); }
+  .admin-table-wrap,
+  .admin-record-list { max-width: 100%; overflow-x: auto; }
+  .agent-dashboard-active .agent-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .agent-dashboard-active .agent-quick-grid>button { min-height: 100px; padding: 14px; }
+  .agent-stage-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .dashboard-page { padding: 0 16px 30px; }
+  .dashboard-top { height: 82px; margin: 0 -16px 16px; padding: 0 14px; gap: 10px; }
+  .dashboard-menu { width: 38px; height: 38px; flex: none; }
+  .dashboard-title h1 { font-size: 24px; }
+  .dashboard-title p { font-size: 11px; }
+  .dashboard-avatar { width: 40px; height: 40px; flex: none; }
+  .dashboard-menu-panel { position: fixed; top: 76px; left: 12px; width: min(270px, calc(100vw - 24px)); }
+  .dashboard-balance { min-height: 0; padding: 20px; }
+  .dashboard-balance>strong { font-size: clamp(30px, 8vw, 40px); overflow-wrap: anywhere; }
+  .dashboard-shortcuts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+  .dashboard-shortcuts>button { min-width: 0; height: 96px; }
+  .dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .dashboard-stats article { min-width: 0; min-height: 102px; padding: 13px; }
+  .dashboard-stats article:first-child { grid-column: auto; }
+  .dashboard-stats article>b { font-size: clamp(17px, 5vw, 23px); overflow-wrap: anywhere; }
+  .dashboard-footer { flex-wrap: wrap; gap: 7px 14px; }
+
+  .agent-dashboard-active .agent-main { padding: 18px 16px 30px; }
+  .agent-dashboard-active .agent-main-head { gap: 10px; }
+  .agent-dashboard-active .agent-main-head h1 { font-size: clamp(22px, 6vw, 27px); }
+  .agent-dashboard-active .agent-balance-card { min-height: 150px; padding: 18px; }
+  .agent-dashboard-active .agent-balance-card strong { font-size: clamp(29px, 8vw, 38px); }
+  .agent-balance-actions { min-width: 104px; }
+  .agent-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .agent-metric-card { min-width: 0; min-height: 135px; padding: 12px; }
+  .agent-metric-title { min-height: 34px; }
+  .agent-metric-title b { font-size: 10px; }
+  .agent-metric-card>strong { font-size: 23px; }
+  .agent-dashboard-active .agent-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agent-dashboard-active .agent-quick-grid>button { grid-template-columns: 32px minmax(0, 1fr); min-height: 92px; gap: 9px; padding: 12px; }
+  .agent-dashboard-active .agent-quick-grid>button>svg:first-child { width: 32px; height: 32px; padding: 7px; }
+  .agent-dashboard-active .agent-quick-grid>button>svg:last-child { display: none; }
+  .agent-dashboard-active .agent-quick-grid small { font-size: 10px; }
+  .agent-stage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agent-order-tools { align-items: stretch; flex-wrap: wrap; }
+  .agent-order-tools label { max-width: none; flex-basis: 100%; }
+  .agent-order-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .agent-order-row>strong { grid-column: 2; grid-row: 1; }
+  .agent-order-status { grid-column: 1 / -1; justify-self: start; }
+  .agent-package-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agent-network-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  .admin-topbar { gap: 9px; padding: 11px 14px; }
+  .admin-heading h1 { font-size: 18px; }
+  .admin-heading p { font-size: 10px; line-height: 1.35; }
+  .admin-content { padding: 16px 14px 28px; }
+  .admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .admin-overview-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-table-wrap table { min-width: 680px; }
+  .admin-date-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 460px) {
+  .dashboard-page { padding-inline: 12px; }
+  .dashboard-top { margin-inline: -12px; padding-inline: 10px; }
+  .dashboard-title h1 { font-size: 21px; }
+  .dashboard-title p { font-size: 10px; }
+  .dashboard-shortcuts>button { height: 86px; border-radius: 15px; }
+  .shortcut-icon { width: 37px; height: 37px; }
+  .dashboard-shortcuts b { font-size: 10px; }
+  .dashboard-recent { padding: 13px 11px; }
+  .dashboard-order { gap: 6px; }
+  .dashboard-order b { overflow-wrap: anywhere; }
+  .dashboard-order small { overflow-wrap: anywhere; }
+  .dashboard-status { white-space: nowrap; }
+  .dashboard-order>strong { white-space: nowrap; }
+
+  .agent-dashboard-active .agent-main { padding-inline: 12px; }
+  .agent-dashboard-active .agent-balance-card { align-items: flex-start; gap: 10px; padding: 15px; }
+  .agent-balance-actions { min-width: 94px; }
+  .agent-dashboard-active .agent-balance-card .agent-balance-refresh,
+  .agent-dashboard-active .agent-balance-card .agent-balance-topup { min-height: 35px; padding-inline: 7px; font-size: 10px; }
+  .agent-metric-card { min-height: 125px; padding: 10px; }
+  .agent-metric-title>span { width: 30px; height: 30px; }
+  .agent-metric-title b { font-size: 9px; }
+  .agent-metric-card>small { font-size: 9px; }
+  .agent-dashboard-active .agent-quick-grid { gap: 8px; }
+  .agent-dashboard-active .agent-quick-grid>button { grid-template-columns: 28px minmax(0, 1fr); min-height: 84px; gap: 7px; padding: 9px; }
+  .agent-dashboard-active .agent-quick-grid>button>svg:first-child { width: 28px; height: 28px; padding: 6px; }
+  .agent-dashboard-active .agent-quick-grid b { font-size: 12px; }
+  .agent-dashboard-active .agent-quick-grid small { font-size: 9px; }
+  .agent-stage-grid { gap: 7px; }
+  .agent-stage { min-width: 0; grid-template-columns: 17px minmax(0, 1fr) auto; gap: 5px; padding: 8px; }
+  .agent-stage span { font-size: 9px; }
+  .agent-package-grid { grid-template-columns: minmax(0, 1fr); }
+  .agent-buy-modes { flex-wrap: wrap; }
+  .agent-buy-modes button { flex: 1 1 100px; }
+
+  .admin-topbar { display: grid; grid-template-columns: 38px minmax(0, 1fr) 38px; }
+  .admin-menu-toggle { grid-column: 1; grid-row: 1; }
+  .admin-heading { grid-column: 2; grid-row: 1; }
+  .admin-avatar { grid-column: 3; grid-row: 1; }
+  .admin-role-badge { grid-column: 1 / 2; grid-row: 2; justify-self: start; padding: 7px 9px; font-size: 9px; }
+  .admin-topbar>.admin-refresh-button:nth-of-type(2),
+  .admin-topbar>.admin-refresh-button:nth-of-type(3) { min-height: 38px; padding: 0 8px; font-size: 10px; }
+  .admin-topbar>.admin-refresh-button:nth-of-type(2) { grid-column: 2; grid-row: 2; }
+  .admin-topbar>.admin-refresh-button:nth-of-type(3) { grid-column: 3; grid-row: 2; }
+  .admin-metric { min-width: 0; min-height: 132px; padding: 13px 11px; }
+  .admin-metric-label { font-size: 8px; }
+  .admin-metric-icon { width: 34px; height: 34px; }
+  .admin-metric>b { font-size: 16px; }
+  .admin-card { padding: 15px 12px; }
+  .admin-card-heading { flex-wrap: wrap; }
+  .admin-card-heading button { max-width: 100%; }
+}
+
+@media (max-width: 360px) {
+  .dashboard-shortcuts { gap: 6px; }
+  .dashboard-shortcuts>button { height: 80px; }
+  .agent-metric-grid,
+  .admin-metrics { grid-template-columns: minmax(0, 1fr); }
+  .agent-dashboard-active .agent-quick-grid { grid-template-columns: minmax(0, 1fr); }
+  .agent-dashboard-active .agent-quick-grid>button { min-height: 74px; }
+}
