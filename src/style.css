@@ -315,6 +315,20 @@
  .agent-dashboard-active .agent-main-head>div:first-of-type{flex:1;min-width:0}
 }
 
+/* Keep desktop dashboard styling while fitting its controls to phone widths. */
+@media(min-width:391px) and (max-width:850px){
+ .agent-dashboard-active .agent-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .agent-dashboard-active .agent-quick-grid>button{min-height:102px;padding:14px}
+ .admin-topbar{flex-wrap:wrap}
+ .admin-heading{min-width:140px}
+ .admin-content{min-width:0}
+}
+@media(max-width:390px){
+ .agent-dashboard-active .agent-quick-grid{grid-template-columns:1fr}
+ .admin-topbar{flex-wrap:wrap}
+ .admin-heading{min-width:0}
+}
+
 /* Bundle purchasing inside the Agent Dashboard workspace. */
 .agent-buy-shop{width:100%;padding:clamp(18px,3vw,34px);border:1px solid #e2e7ef;border-radius:20px;background:#fff;box-shadow:0 10px 30px #16233b0a;color:#15243a}
 .agent-buy-title{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 22px}
