@@ -267,7 +267,7 @@
 .agent-dashboard-active .agent-quick-grid>button>svg:first-child{width:42px;height:42px;padding:9px;border-radius:8px;background:#ffffff20}
 .agent-dashboard-active .agent-quick-grid b{font-size:15px}
 .agent-dashboard-active .agent-quick-grid small{font-size:12px}
-.agent-dashboard-active .agent-quick-buy{background:#3478ed}.agent-dashboard-active .agent-quick-wallet{background:#18bc61}.agent-dashboard-active .agent-quick-history{background:#9b42ed}
+.agent-dashboard-active .agent-quick-buy{background:#3478ed}.agent-dashboard-active .agent-quick-wallet{background:#18bc61}.agent-dashboard-active .agent-quick-history{background:#9b42ed}.agent-dashboard-active .agent-quick-airtime{background:linear-gradient(120deg,#f97316,#db2777)}
 .agent-dashboard-active .agent-order-panel{border-color:#ffffff18;background:#fff;color:#1d2a3e}
 .agent-dashboard-active .agent-order-heading h2{color:#1d2a3e}.agent-dashboard-active .agent-order-heading p{color:#718096}
 .agent-dashboard-active .agent-dashboard-footer{color:#c3cee0}
