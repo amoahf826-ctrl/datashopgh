@@ -97,6 +97,36 @@ body,
 .agent-store-logo-preview button { padding: 8px 11px; border: 1px solid #f2cbd0; border-radius: 9px; background: #fff5f5; color: #a52d3a; font: 700 10px 'DM Sans', sans-serif; cursor: pointer; }
 .agent-shop-brand-image { overflow: hidden; }
 .agent-shop-brand-image img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.agent-afa-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.agent-afa-heading>span { display: grid; width: 44px; height: 44px; flex: none; place-items: center; border-radius: 13px; background: #fff3c4; color: #a36f00; }
+.agent-afa-heading h2 { margin: 0 0 5px; color: #21152e; font: 750 18px Manrope, sans-serif; }
+.agent-afa-heading p { margin: 0; color: #797181; font-size: 11px; line-height: 1.5; }
+.agent-afa-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.agent-afa-plans article { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 16px; border: 1px solid #f0dfaa; border-radius: 15px; background: #fffdf5; }
+.agent-afa-plans article.selected { border-color: #e9a11b; box-shadow: 0 0 0 2px #fce4a6; }
+.agent-afa-plans article>span { padding: 5px 9px; border-radius: 20px; background: #fff0ba; color: #8b6200; font-size: 9px; font-weight: 800; letter-spacing: .06em; }
+.agent-afa-plans h3 { margin: 0; color: #21152e; font: 750 15px Manrope, sans-serif; }
+.agent-afa-plans p { margin: 0; color: #797181; font-size: 11px; line-height: 1.5; }
+.agent-afa-plans strong { color: #28543b; font: 800 17px Manrope, sans-serif; }
+.agent-afa-plans button { display: inline-flex; align-items: center; gap: 7px; margin-top: auto; padding: 10px 12px; border: 0; border-radius: 10px; background: #f58218; color: white; font: 700 11px 'DM Sans', sans-serif; cursor: pointer; }
+.agent-afa-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 20px; padding: 17px; border: 1px solid #ece4d6; border-radius: 15px; background: #fffdfa; }
+.agent-afa-form>div:first-child { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; }
+.agent-afa-form h3 { margin: 0; font: 750 14px Manrope, sans-serif; }
+.agent-afa-form>div:first-child button { border: 0; background: transparent; color: #6d28d9; font: 700 11px 'DM Sans', sans-serif; cursor: pointer; }
+.agent-afa-form>label:not(.agent-afa-consent) { display: grid; gap: 6px; color: #342844; font-size: 11px; font-weight: 700; }
+.agent-afa-form input:not([type='checkbox']),
+.agent-afa-form textarea { box-sizing: border-box; width: 100%; min-height: 41px; padding: 10px; border: 1px solid #ddd4e7; border-radius: 10px; background: white; color: #21152e; font: 500 12px 'DM Sans', sans-serif; }
+.agent-afa-form textarea { min-height: 76px; resize: vertical; }
+.agent-afa-note,
+.agent-afa-consent,
+.agent-afa-form>.agent-save,
+.agent-afa-form>[role='status'] { grid-column: 1 / -1; }
+.agent-afa-consent { display: flex; align-items: flex-start; gap: 8px; color: #5b5262; font-size: 10px; line-height: 1.5; }
+.agent-afa-consent input { flex: none; margin: 1px 0 0; accent-color: #6d28d9; }
+.agent-afa-form>.agent-save { justify-self: start; margin-top: 0; }
+.agent-afa-form>[role='status'],
+.agent-afa-message { margin: 0; color: #6d28d9; font-size: 11px; }
+.agent-afa-empty { padding: 20px; border: 1px dashed #e8d9aa; border-radius: 13px; background: #fffdf5; color: #797181; font-size: 12px; text-align: center; }
 
 @media (min-width: 1200px) {
   .dashboard-wrap { max-width: 1160px; }
@@ -190,6 +220,12 @@ body,
   .agent-history-filters input,
   .agent-history-filters input[type='date'] { width: 100%; min-width: 0; }
   .agent-store-brand-editor { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+  .agent-afa-form { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+  .agent-afa-form>div:first-child,
+  .agent-afa-note,
+  .agent-afa-consent,
+  .agent-afa-form>.agent-save,
+  .agent-afa-form>[role='status'] { grid-column: 1; }
   .agent-store-brand-editor h3,
   .agent-store-brand-editor>p,
   .agent-store-logo-preview { grid-column: 1; }
