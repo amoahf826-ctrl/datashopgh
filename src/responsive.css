@@ -396,3 +396,60 @@ body,
   .public-announcements { gap: 11px; }
   .agent-dashboard-announcements,.dashboard-announcements { margin: 14px 0; }
 }
+.agent-cashout-page { display: grid; gap: 16px; }
+.agent-cashout-hero { min-height: 130px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px; border-radius: 20px; background: linear-gradient(115deg,#5b21b6,#7c32d0 65%,#f97316); color: #fff; box-shadow: 0 12px 28px #55218b20; }
+.agent-cashout-hero>div { display: grid; gap: 7px; }
+.agent-cashout-hero span { display: flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 800; letter-spacing: .09em; }
+.agent-cashout-hero strong { font: 850 clamp(28px,4vw,40px) Manrope,sans-serif; }
+.agent-cashout-hero small { color: #f0e6fa; font-size: 11px; }
+.agent-cashout-hero button { display: flex; align-items: center; gap: 7px; padding: 10px 13px; border: 0; border-radius: 10px; background: #ffffff24; color: #fff; font: 700 11px 'DM Sans',sans-serif; cursor: pointer; }
+.agent-cashout-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.agent-cashout-metrics article { display: grid; gap: 8px; padding: 16px; border: 1px solid #e9e4ee; border-radius: 16px; background: #fff; }
+.agent-cashout-metrics article>span { color: #756b7e; font-size: 11px; font-weight: 700; }
+.agent-cashout-metrics article>b { color: #342247; font: 800 21px Manrope,sans-serif; }
+.agent-cashout-metrics article>small { color: #8a8290; font-size: 10px; }
+.agent-cashout-card { margin: 0; }
+.agent-cashout-heading { display: flex; align-items: flex-start; gap: 11px; }
+.agent-cashout-heading>span { width: 38px; height: 38px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f2eaff; color: #6d28d9; }
+.agent-cashout-heading h2 { margin: 0; }
+.agent-cashout-heading p { margin: 5px 0 0; color: #797181; font-size: 11px; line-height: 1.5; }
+.agent-cashout-payout-form,.agent-cashout-request-form { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: 12px; margin-top: 18px; }
+.agent-cashout-payout-form label,.agent-cashout-request-form label { display: grid; gap: 7px; color: #44364f; font-size: 11px; font-weight: 750; }
+.agent-cashout-payout-form input,.agent-cashout-payout-form select,.agent-cashout-request-form input { width: 100%; height: 42px; box-sizing: border-box; padding: 0 11px; border: 1px solid #e1dbe8; border-radius: 11px; background: #fff; color: #241a2c; font: 600 12px 'DM Sans',sans-serif; }
+.agent-cashout-payout-form .agent-save,.agent-cashout-request-form .agent-save { margin: 0; min-height: 42px; white-space: nowrap; }
+.agent-cashout-destination { display: grid; gap: 5px; color: #77707f; font-size: 10px; }
+.agent-cashout-destination b { color: #49385a; }
+.agent-earnings-list,.agent-cashout-history,.admin-cashout-list { margin-top: 14px; border-top: 1px solid #eee9f1; }
+.agent-earnings-list article,.agent-cashout-history article { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 2px; border-bottom: 1px solid #f0edf2; }
+.agent-earnings-list article>div,.agent-cashout-history article>div { display: grid; gap: 5px; min-width: 0; }
+.agent-earnings-list b,.agent-cashout-history b { color: #30233d; font: 700 11px Manrope,sans-serif; }
+.agent-earnings-list small,.agent-cashout-history small { color: #81788a; font-size: 10px; overflow-wrap: anywhere; }
+.agent-earnings-list article>strong { color: #07834b; font: 800 13px Manrope,sans-serif; }
+.agent-cashout-status { justify-self: start; padding: 6px 9px; border-radius: 20px; background: #fff4d7; color: #946000; font-size: 9px; font-weight: 800; text-transform: capitalize; }
+.agent-cashout-status.processing { background: #e8efff; color: #315eb2; }
+.agent-cashout-status.paid { background: #e6f8ee; color: #087644; }
+.agent-cashout-status.rejected { background: #fff0ef; color: #b33137; }
+.agent-cashout-empty { margin: 16px 0 0; color: #81788a; font-size: 11px; }
+.admin-cashout-filters { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 18px 0 4px; }
+.admin-cashout-filters label { display: grid; gap: 6px; color: #5c6572; font-size: 11px; font-weight: 700; }
+.admin-cashout-filters select { min-width: 160px; height: 40px; padding: 0 10px; border: 1px solid #dfe4ea; border-radius: 10px; background: #fff; }
+.admin-cashout-filters>span { color: #79818d; font-size: 11px; }
+.admin-cashout-list>article { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: center; gap: 10px 16px; padding: 16px 3px; border-bottom: 1px solid #e9edf1; }
+.admin-cashout-agent,.admin-cashout-amount { display: grid; gap: 5px; min-width: 0; }
+.admin-cashout-agent b { color: #172033; font: 750 13px Manrope,sans-serif; }
+.admin-cashout-agent small,.admin-cashout-amount small,.admin-cashout-list article>small { color: #687384; font-size: 10px; overflow-wrap: anywhere; }
+.admin-cashout-agent code { color: #8a91a0; font-size: 9px; overflow-wrap: anywhere; }
+.admin-cashout-amount strong { color: #13844b; font: 800 16px Manrope,sans-serif; }
+.admin-cashout-actions { grid-column: 1/-1; display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-cashout-actions button { min-height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid #e0e5eb; border-radius: 9px; background: #fff; color: #334155; font: 700 10px 'DM Sans',sans-serif; cursor: pointer; }
+.admin-cashout-actions button.paid { border-color: #c9efda; background: #e9f9f0; color: #087644; }
+.admin-cashout-actions button.reject { border-color: #ffe0dd; background: #fff1ef; color: #b33137; }
+.admin-cashout-actions button:disabled { opacity: .55; cursor: wait; }
+@media(max-width:700px) {
+  .agent-cashout-metrics { grid-template-columns: 1fr; }
+  .agent-cashout-payout-form,.agent-cashout-request-form { grid-template-columns: minmax(0,1fr); }
+  .agent-cashout-payout-form .agent-save,.agent-cashout-request-form .agent-save { justify-self: start; }
+  .admin-cashout-list>article { grid-template-columns: minmax(0,1fr) auto; }
+  .admin-cashout-amount { grid-column: 1; }
+  .admin-cashout-filters { align-items: center; }
+}
