@@ -127,6 +127,61 @@ body,
 .agent-afa-form>[role='status'],
 .agent-afa-message { margin: 0; color: #6d28d9; font-size: 11px; }
 .agent-afa-empty { padding: 20px; border: 1px dashed #e8d9aa; border-radius: 13px; background: #fffdf5; color: #797181; font-size: 12px; text-align: center; }
+.agent-airtime-markups { display: grid; gap: 10px; margin: 18px 0; padding: 16px; border: 1px solid #e6def0; border-radius: 15px; background: #fcfaff; }
+.agent-airtime-markups h3 { margin: 0 0 4px; color: #2e2040; font: 750 14px Manrope, sans-serif; }
+.agent-airtime-markups p { margin: 0; color: #797181; font-size: 11px; }
+.agent-airtime-markups>label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #eee9f1; color: #342844; font-size: 11px; font-weight: 700; }
+.agent-airtime-markups>label>span { display: grid; gap: 4px; }
+.agent-airtime-markups>label small { color: #827b89; font-size: 10px; font-weight: 500; }
+.agent-airtime-markups>label>div { display: flex; align-items: center; gap: 6px; }
+.agent-airtime-markups input { box-sizing: border-box; width: 100px; height: 38px; padding: 0 9px; border: 1px solid #ddd4e7; border-radius: 9px; background: #fff; color: #21152e; font: 600 12px 'DM Sans', sans-serif; }
+.agent-airtime-markups>button { justify-self: start; margin-top: 2px; }
+.airtime-folder { border-color: #e5d8f1; background: linear-gradient(135deg,#fff,#f6efff); }
+.airtime-folder-logo { display: grid; place-items: center; background: #6d28d9; color: #fff; }
+.airtime-folder-logo svg { width: 28px; height: 28px; }
+.airtime-folder .category-pill-airtime { background: #6d28d9; color: #fff; }
+.airtime-store-page { padding: 20px; border: 1px solid #e8def3; border-radius: 22px; background: #fff; box-shadow: 0 15px 38px #24143d0c; }
+.airtime-store-heading { display: flex; align-items: center; gap: 13px; margin: 4px 0 18px; }
+.airtime-store-heading>span { display: grid; width: 54px; height: 54px; flex: none; place-items: center; border-radius: 16px; background: #6d28d9; color: #fff; }
+.airtime-store-heading>div { display: grid; gap: 4px; }
+.airtime-store-heading small { color: #7c6a91; font-size: 9px; font-weight: 800; letter-spacing: .13em; }
+.airtime-store-heading h1 { margin: 0; color: #32145f; font: 800 21px Manrope, sans-serif; }
+.airtime-store-heading p { margin: 0; color: #778092; font-size: 12px; }
+.airtime-plan-panel { display: grid; gap: 15px; padding: 18px; border: 1px solid #e9e1f0; border-radius: 17px; background: #fcfaff; }
+.airtime-plan-panel>p { margin: 0; color: #70677c; font-size: 12px; }
+.airtime-network-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
+.airtime-network-options button { min-height: 48px; padding: 8px; border: 1px solid #e3dce9; border-radius: 12px; background: #fff; color: #30263a; font: 750 11px 'DM Sans',sans-serif; cursor: pointer; }
+.airtime-network-options button.active { border-color: #6d28d9; background: #6d28d9; color: #fff; }
+.airtime-network-options button.mtn.active { border-color: #e7ae00; background: #ffcb05; color: #332800; }
+.airtime-network-options button.at.active { border-color: #243f78; background: #243f78; color: #fff; }
+.airtime-network-options button.telecel.active { border-color: #ed1c2e; background: #ed1c2e; color: #fff; }
+.airtime-amount-field { display: grid; gap: 7px; color: #342844; font-size: 11px; font-weight: 700; }
+.airtime-amount-field input { box-sizing: border-box; width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid #ddd4e7; border-radius: 11px; background: #fff; color: #21152e; font: 600 14px 'DM Sans',sans-serif; }
+.airtime-price-summary { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; padding: 13px; border: 1px solid #e6def0; border-radius: 12px; background: #fff; color: #70677c; font-size: 11px; }
+.airtime-price-summary>b { color: #342844; }
+.airtime-price-summary>strong { display: flex; grid-column: 1/-1; justify-content: space-between; gap: 10px; padding-top: 9px; border-top: 1px solid #eee9f1; color: #2e2040; font-size: 13px; }
+.airtime-price-summary>strong b { color: #6d28d9; }
+.airtime-unavailable { display: grid; gap: 5px; padding: 12px; border: 1px solid #f0d2aa; border-radius: 12px; background: #fff8ee; color: #6d4b25; }
+.airtime-unavailable b { font-size: 11px; }
+.airtime-unavailable span { font-size: 10px; line-height: 1.5; }
+.agent-store-visibility { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 10px 16px; margin: 18px 0; padding: 16px; border: 1px solid #e8def3; border-radius: 15px; background: #f8f3ff; }
+.agent-store-visibility h3 { margin: 0 0 5px; color: #2e2040; font: 750 14px Manrope,sans-serif; }
+.agent-store-visibility p { margin: 0; color: #797181; font-size: 11px; line-height: 1.45; }
+.agent-store-visibility>label { display: flex; align-items: center; gap: 7px; color: #4c1d95; font-size: 11px; font-weight: 750; }
+.agent-store-visibility>label input { width: 17px; height: 17px; accent-color: #6d28d9; }
+.agent-store-visibility>.agent-save { grid-column: 1/-1; justify-self: start; margin-top: 0; }
+.agent-info-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-top: 18px; }
+.agent-info-grid article { display: grid; align-content: start; gap: 10px; min-height: 135px; padding: 16px; border: 1px solid #e8def3; border-radius: 15px; background: #fff; }
+.agent-info-grid article>b { font: 800 10px 'DM Sans',sans-serif; letter-spacing: .09em; }
+.agent-info-grid article>strong { color: #20152d; font: 800 18px Manrope,sans-serif; }
+.agent-info-grid article>small { color: #716979; font-size: 10px; line-height: 1.5; }
+.agent-info-grid .agent-info-mtn { border-top: 3px solid #ffcb05; }
+.agent-info-grid .agent-info-at { border-top: 3px solid #243f78; }
+.agent-info-grid .agent-info-telecel { border-top: 3px solid #ed1c2e; }
+.agent-info-mtn>b { color: #987300; }
+.agent-info-at>b { color: #243f78; }
+.agent-info-telecel>b { color: #c32332; }
+.agent-info-note { margin: 14px 0 0; color: #797181; font-size: 10px; line-height: 1.5; }
 
 @media (min-width: 1200px) {
   .dashboard-wrap { max-width: 1160px; }
@@ -221,6 +276,10 @@ body,
   .agent-history-filters input[type='date'] { width: 100%; min-width: 0; }
   .agent-store-brand-editor { grid-template-columns: minmax(0, 1fr); padding: 14px; }
   .agent-afa-form { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+  .airtime-store-page { padding: 14px; }
+  .airtime-network-options { grid-template-columns: 1fr; }
+  .agent-info-grid { grid-template-columns: minmax(0,1fr); }
+  .airtime-store-heading h1 { font-size: 18px; }
   .agent-afa-form>div:first-child,
   .agent-afa-note,
   .agent-afa-consent,
@@ -319,4 +378,21 @@ body,
   .admin-metrics { grid-template-columns: minmax(0, 1fr); }
   .agent-dashboard-active .agent-quick-grid { grid-template-columns: minmax(0, 1fr); }
   .agent-dashboard-active .agent-quick-grid>button { min-height: 74px; }
+}
+.admin-announcement-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 20px 0 4px; padding: 5px; border: 1px solid #e7e1ed; border-radius: 14px; background: #f8f6fa; }
+.admin-announcement-tabs button { min-height: 42px; padding: 8px 12px; border: 0; border-radius: 10px; background: transparent; color: #655a70; font: 700 12px 'DM Sans',sans-serif; cursor: pointer; }
+.admin-announcement-tabs button.active { background: #6d28d9; color: #fff; box-shadow: 0 4px 12px #6d28d926; }
+.public-announcements { display: grid; gap: 14px; }
+.public-announcements .public-shop-update { min-width: 0; margin: 0; overflow: hidden; }
+.public-announcements .announcement-text-only { padding: 16px; }
+.public-announcements .announcement-text-only .notice-copy { padding: 12px 0 0; }
+.public-announcements .announcement-with-image .notice-copy { padding-top: 12px; }
+.agent-dashboard-announcements,.dashboard-announcements { margin: 18px 0; }
+.agent-dashboard-announcements .public-shop-update { border-left: 4px solid #f97316; }
+.agent-dashboard-announcements .public-shop-update.success { border-left-color: #18b56a; }
+.agent-dashboard-announcements .public-shop-update.warning { border-left-color: #e7a400; }
+@media(max-width:620px) {
+  .admin-announcement-tabs { grid-template-columns: 1fr; }
+  .public-announcements { gap: 11px; }
+  .agent-dashboard-announcements,.dashboard-announcements { margin: 14px 0; }
 }
