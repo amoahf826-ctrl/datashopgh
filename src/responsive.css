@@ -379,7 +379,7 @@ body,
   .agent-dashboard-active .agent-quick-grid { grid-template-columns: minmax(0, 1fr); }
   .agent-dashboard-active .agent-quick-grid>button { min-height: 74px; }
 }
-.admin-announcement-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 20px 0 4px; padding: 5px; border: 1px solid #e7e1ed; border-radius: 14px; background: #f8f6fa; }
+.admin-announcement-tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 20px 0 4px; padding: 5px; border: 1px solid #e7e1ed; border-radius: 14px; background: #f8f6fa; }
 .admin-announcement-tabs button { min-height: 42px; padding: 8px 12px; border: 0; border-radius: 10px; background: transparent; color: #655a70; font: 700 12px 'DM Sans',sans-serif; cursor: pointer; }
 .admin-announcement-tabs button.active { background: #6d28d9; color: #fff; box-shadow: 0 4px 12px #6d28d926; }
 .public-announcements { display: grid; gap: 14px; }
