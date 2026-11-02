@@ -29,9 +29,8 @@ Deno.serve(async (request: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = readKey("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
   const serviceKey = readKey("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
-  const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
-  const hubnetBase = Deno.env.get("HUBNET_API_BASE_URL")?.trim().replace(/\/+$/, "");
-  if (!supabaseUrl || !anonKey || !serviceKey || !hubnetToken || !hubnetBase) {
+  const datahubKey = Deno.env.get("DATAHUB_API_KEY")?.trim();
+  if (!supabaseUrl || !anonKey || !serviceKey || !datahubKey) {
     return json(503, { error: "Wallet bundle delivery is not fully configured on the server." });
   }
 
@@ -71,10 +70,17 @@ Deno.serve(async (request: Request) => {
   }
   if (!order.created) return json(200, { success: true, ...order, duplicate: true });
 
-  const networkMap: Record<string, string> = { MTN: "mtn", Telecel: "telecel", AT: "at" };
-  const network = networkMap[String(order.network)];
+  const { data: orderRecord } = await service.from("orders").select("bundle_id").eq("id", order.order_id).maybeSingle();
+  const { data: plan } = orderRecord?.bundle_id
+    ? await service.from("bundles").select("category,subcategory").eq("id", orderRecord.bundle_id).maybeSingle()
+    : { data: null };
+  const category = `${plan?.category ?? ""} ${plan?.subcategory ?? ""}`.toLowerCase();
+  const networkKey = String(order.network) === "MTN"
+    ? (/xpress|express/.test(category) ? "mtn_xpress" : "YELLO")
+    : String(order.network) === "Telecel" ? "TELECEL"
+    : String(order.network) === "AT" ? (/big[\s-]?time/.test(category) ? "AT_BIGTIME" : "AT_PREMIUM") : null;
   const size = String(order.size ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i);
-  if (!network || !size) {
+  if (!networkKey || !size) {
     await service.rpc("update_live_order_delivery", {
       p_reference: deliveryReference, p_delivery_status: "failed",
     });
@@ -83,35 +89,30 @@ Deno.serve(async (request: Request) => {
       message: "The bundle could not be delivered. The wallet debit was refunded." });
   }
 
-  const volume = String(Math.round(Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1000 : 1)));
-  const tokenHeader = /^Bearer\s+/i.test(hubnetToken) ? hubnetToken : `Bearer ${hubnetToken}`;
-  const webhookUrl = `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/hubnet-webhook`;
+  const capacity = String(Number((Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1 : 0.001)).toFixed(3)));
   try {
-    const delivery = await fetch(`${hubnetBase}/live/api/context/business/transaction/${network}-new-transaction`, {
+    const delivery = await fetch("https://app.datahubgh.com/api/external/data-purchase", {
       method: "POST",
-      headers: { token: tokenHeader, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ phone: body.recipient_phone, volume, reference: deliveryReference, webhook: webhookUrl }),
+      headers: { "X-API-Key": datahubKey, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ networkKey, recipient: body.recipient_phone, capacity }),
       signal: AbortSignal.timeout(15000),
     });
     const result = await delivery.json().catch(() => null);
-    const envelope = result?.response ?? result;
-    const resultData = envelope?.data ?? result?.data ?? {};
-    const resultStatus = String(resultData?.status ?? envelope?.status ?? "").toLowerCase();
-    const providerId = envelope?.transaction_id ?? resultData?.transaction_id ?? null;
-
-    if (delivery.ok && ["true", "success", "processing", "pending"].includes(resultStatus)) {
-      const delivered = ["success", "delivered", "completed"].includes(String(resultData?.status).toLowerCase());
+    const resultData = result?.data ?? {};
+    const resultStatus = String(resultData.status ?? "").toUpperCase();
+    if (delivery.ok && result?.success === true && typeof resultData.reference === "string" && ["SUCCESSFUL", "PROCESSING", "PENDING"].includes(resultStatus)) {
+      const delivered = resultStatus === "SUCCESSFUL";
       const deliveryStatus = delivered ? "delivered" : "processing";
       await service.rpc("update_live_order_delivery", {
-        p_reference: deliveryReference, p_delivery_status: deliveryStatus, p_provider_transaction_id: providerId,
+        p_reference: deliveryReference, p_delivery_status: deliveryStatus, p_provider_transaction_id: resultData.reference,
       });
       return json(200, { success: true, ...order, delivery_status: deliveryStatus,
         message: delivered ? "Data delivered successfully." : "Order accepted and is being processed." });
     }
 
-    if (["failed", "cancelled"].includes(resultStatus)) {
+    if (delivery.status >= 400 && delivery.status < 500) {
       await service.rpc("update_live_order_delivery", {
-        p_reference: deliveryReference, p_delivery_status: "failed", p_provider_transaction_id: providerId,
+        p_reference: deliveryReference, p_delivery_status: "failed",
       });
       const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", {
         p_delivery_reference: deliveryReference,

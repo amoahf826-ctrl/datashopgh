@@ -34,17 +34,18 @@ The migrations create customer-isolated RLS policies, seeded demonstration netwo
 
 ## Payments and delivery
 
-The storefront supports a staged live bundle checkout path. Live checkout is disabled by default. It initializes Paystack from a Supabase Edge Function, verifies the signed `charge.success` event against Paystack's transaction verification endpoint, checks the authoritative GHS amount, and only then submits the order to Hubnet. A verified Hubnet status callback is required before an order is marked successful. Wallet deposits, MTN AFA registration, bulk SMS, and other preview-only admin actions are not part of live bundle checkout.
+The storefront supports a staged live bundle checkout path. Live checkout is disabled by default. It initializes Paystack from a Supabase Edge Function, verifies the signed `charge.success` event against Paystack's transaction verification endpoint, checks the authoritative GHS amount, and only then submits the order to DataHub GH. DataHub order status webhooks update delivery state; wallet orders are refunded only on confirmed provider failure. Wallet deposits, MTN AFA registration, bulk SMS, and other preview-only admin actions are not part of live bundle checkout.
 
 ## Prepare live bundle checkout
 
 1. Apply `supabase/migrations/202610180010_live_sales.sql` after the prior migrations.
 2. Add `PAYSTACK_SECRET_KEY` using the live secret key in Supabase Edge Function secrets. The checkout function rejects test keys. Also set `APP_BASE_URL` to the production website origin, such as `https://your-store.example`; never put provider secrets in a `VITE_` variable or the browser.
-3. Keep `HUBNET_API_BASE_URL` set to `https://console.hubnet.app` and `HUBNET_BEARER_TOKEN` in Supabase secrets.
-4. Deploy `paystack-checkout`, `paystack-webhook`, `hubnet-webhook`, and the updated `hubnet-readonly` Edge Functions. `paystack-webhook` and `hubnet-webhook` must have gateway JWT verification disabled; they validate the Paystack signature or verify the Hubnet status server-to-server themselves.
+3. Add `DATAHUB_API_KEY` and a randomly generated `DATAHUB_WEBHOOK_TOKEN` (at least 32 characters) in Supabase Edge Function secrets. Keep both out of browser variables and source control.
+4. Deploy `paystack-checkout`, `paystack-webhook`, `datahub-webhook`, `wallet-bundle-purchase`, and `hubnet-readonly` Edge Functions. The `paystack-webhook` verifies Paystack's signature; `datahub-webhook` validates its secret URL token, timestamp, and event headers.
 5. Set the Paystack dashboard webhook URL to `https://<project-ref>.supabase.co/functions/v1/paystack-webhook`.
-6. In Admin → Data Plans, set final reviewed prices and mark only approved, deliverable plans as non-demonstration plans. Seed plans are deliberately demonstration-only, and checkout rejects them.
-7. Keep `storefront_live_sales.enabled` false until secrets, function deployments, webhook URL, and live catalogue have been reviewed. Enabling it exposes live checkout; customers can then make real Paystack payments and Hubnet orders may be submitted. Set it in the SQL editor only after that review:
+6. Set the DataHub API key's webhook URL to `https://<project-ref>.supabase.co/functions/v1/datahub-webhook?token=<DATAHUB_WEBHOOK_TOKEN>`.
+7. In Admin → Data Plans, set final reviewed prices and mark only approved, deliverable plans as non-demonstration plans. Seed plans are deliberately demonstration-only, and checkout rejects them.
+8. Keep `storefront_live_sales.enabled` false until secrets, function deployments, both webhook URLs, DataHub balance, and live catalogue have been reviewed. Enabling it exposes live checkout; customers can then make real Paystack payments and DataHub orders may be submitted. Set it in the SQL editor only after that review:
 
 ```sql
 update public.platform_settings
@@ -52,13 +53,13 @@ set value = jsonb_set(value, '{enabled}', 'true'::jsonb), updated_at = now()
 where key = 'storefront_live_sales';
 ```
 
-To return to preview mode, set `enabled` to `false`. If Hubnet times out after accepting an order, the app preserves an unknown/in-progress state rather than retrying automatically, to avoid duplicate delivery; reconcile that order with Hubnet before taking further action.
+To return to preview mode, set `enabled` to `false`. If DataHub times out after accepting an order, the app preserves an unknown/in-progress state rather than retrying automatically, to avoid duplicate delivery; reconcile that order with DataHub before taking further action.
 
 ## Admin access
 
 The admin console reads the role from the protected profile row, and every catalogue edit or record query is also enforced by database RLS. Administrators can manage network and bundle availability and prices, create MTN AFA plans, review customer AFA requests, manage agent accounts, inspect statistics/debtors, save SMS previews, maintain provider metadata, and set storefront maintenance notices. Customers can view the status of their own AFA requests. AFA requests are test-mode records only; they do not trigger payment or MTN registration. SMS previews are not delivered; API provider records contain no credentials and do not enable live calls. Catalogue, deposit, wallet adjustment, AFA plan, and AFA request status changes write audit events. Admin access is controlled by the profile role and should only be assigned by a trusted operator through the database.
 
-The `hubnet-readonly` Supabase Edge Function provides an admin-only balance check by calling `GET /live/api/context/business/transaction/check_balance`. The `datahub-readonly` function verifies the GhanaDataHub API key by reading its balance and network list; it does not submit orders or route fulfillment. Store `GHANADATAHUB_API_KEY` in Supabase Edge Function secrets and deploy `datahub-readonly` before using Admin → API Providers → Verify DataHub API. The live bundle fulfillment path remains Hubnet until a separate DataHub order-routing and status-reconciliation integration is implemented and reviewed. Keep provider and payment credentials in Supabase function secrets, never in browser variables or source control.
+The `hubnet-readonly` Supabase Edge Function remains for Hubnet balance and MTN number-verification tools. Live bundle fulfillment uses DataHub GH's `POST /api/external/data-purchase` endpoint with the `X-API-Key` header and the network keys documented by DataHub. The `datahub-webhook` endpoint reconciles `order.status_updated` events using a separate secret URL token because DataHub's guide documents no signed webhook header. Keep provider and payment credentials in Supabase function secrets, never in browser variables or source control.
 
 ## Build and publish
 

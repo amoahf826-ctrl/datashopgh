@@ -30,8 +30,7 @@ Deno.serve(async (request: Request) => {
   const secret = Deno.env.get("PAYSTACK_SECRET_KEY")?.trim();
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = readSupabaseServiceKey();
-  const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
-  const hubnetBase = Deno.env.get("HUBNET_API_BASE_URL")?.trim().replace(/\/+$/, "");
+  const datahubKey = Deno.env.get("DATAHUB_API_KEY")?.trim();
   if (!secret || !supabaseUrl || !serviceKey) return response(503, { error: "Paystack webhook service is not configured." });
 
   const raw = await request.text();
@@ -79,7 +78,7 @@ Deno.serve(async (request: Request) => {
   if (orderError) return response(500, { error: "Could not load the order." });
   if (!existing) return response(200, { received: true });
   if (existing.payment_status === "successful") return response(200, { received: true, duplicate: true });
-  if (!hubnetToken || !hubnetBase) return response(503, { error: "Hubnet delivery is not configured; Paystack may retry this webhook." });
+  if (!datahubKey) return response(503, { error: "DataHub delivery is not configured; Paystack may retry this webhook." });
 
   let verification: any;
   try {
@@ -105,38 +104,42 @@ Deno.serve(async (request: Request) => {
   if (claimError) return response(500, { error: "Verified payment could not be reconciled." });
   if (!claim?.newly_paid) return response(200, { received: true, duplicate: true });
 
-  const networkMap: Record<string, string> = { MTN: "mtn", Telecel: "telecel", AT: "at" };
-  const network = networkMap[String(claim.network)];
+  const { data: orderRecord } = await service.from("orders").select("bundle_id").eq("id", claim.order_id).maybeSingle();
+  const { data: plan } = orderRecord?.bundle_id
+    ? await service.from("bundles").select("category,subcategory").eq("id", orderRecord.bundle_id).maybeSingle()
+    : { data: null };
+  const category = `${plan?.category ?? ""} ${plan?.subcategory ?? ""}`.toLowerCase();
+  const networkKey = String(claim.network) === "MTN"
+    ? (/xpress|express/.test(category) ? "mtn_xpress" : "YELLO")
+    : String(claim.network) === "Telecel" ? "TELECEL"
+    : String(claim.network) === "AT" ? (/big[\s-]?time/.test(category) ? "AT_BIGTIME" : "AT_PREMIUM") : null;
   const size = String(claim.size ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i);
-  if (!network || !size) {
+  if (!networkKey || !size) {
     await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "failed" });
     return response(200, { received: true, delivered: false });
   }
-  const volume = String(Math.round(Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1000 : 1)));
-  const tokenHeader = /^Bearer\s+/i.test(hubnetToken) ? hubnetToken : `Bearer ${hubnetToken}`;
-  const webhookUrl = `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/hubnet-webhook`;
+  const capacity = String(Number((Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1 : 0.001)).toFixed(3)));
   try {
-    const delivery = await fetch(`${hubnetBase}/live/api/context/business/transaction/${network}-new-transaction`, {
+    const delivery = await fetch("https://app.datahubgh.com/api/external/data-purchase", {
       method: "POST",
-      headers: { token: tokenHeader, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ phone: claim.phone, volume, reference: claim.delivery_reference, webhook: webhookUrl }),
+      headers: { "X-API-Key": datahubKey, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ networkKey, recipient: claim.phone, capacity }),
       signal: AbortSignal.timeout(15000),
     });
     const result = await delivery.json().catch(() => null);
-    const envelope = result?.response ?? result;
-    const resultData = envelope?.data ?? result?.data ?? {};
-    const resultStatus = String(resultData?.status ?? envelope?.status ?? "").toLowerCase();
-    const providerId = envelope?.transaction_id ?? resultData?.transaction_id ?? null;
-    if (delivery.ok && (resultStatus === "true" || resultStatus === "success" || resultStatus === "processing" || resultStatus === "pending")) {
-      const final = ["success", "delivered", "completed"].includes(String(resultData?.status).toLowerCase());
+    const resultData = result?.data ?? {};
+    const resultStatus = String(resultData.status ?? "").toUpperCase();
+    if (delivery.ok && result?.success === true && typeof resultData.reference === "string" && ["SUCCESSFUL", "PROCESSING", "PENDING"].includes(resultStatus)) {
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,
-        p_delivery_status: final ? "delivered" : "processing",
-        p_provider_transaction_id: providerId,
+        p_delivery_status: resultStatus === "SUCCESSFUL" ? "delivered" : "processing",
+        p_provider_transaction_id: resultData.reference,
       });
-    } else if (resultStatus === "failed" || resultStatus === "cancelled") {
+    } else if (delivery.ok && result?.success === true) {
+      await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "unknown" });
+    } else if (delivery.status >= 400 && delivery.status < 500) {
       await service.rpc("update_live_order_delivery", {
-        p_reference: claim.delivery_reference, p_delivery_status: "failed", p_provider_transaction_id: providerId,
+        p_reference: claim.delivery_reference, p_delivery_status: "failed",
       });
     } else {
       await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "unknown" });

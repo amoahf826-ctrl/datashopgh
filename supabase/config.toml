@@ -4,6 +4,7 @@ verify_jwt = false
 [functions.hubnet-webhook]
 verify_jwt = false
 
-[functions.datahub-readonly]
-verify_jwt = true
+[functions.datahub-webhook]
+verify_jwt = false
+
 
