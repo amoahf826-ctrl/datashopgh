@@ -82,8 +82,8 @@ body { color: var(--brand-ink); background: var(--brand-paper); }
 .admin-layout .admin-action:hover { border-color: var(--brand-gold-deep); background: var(--brand-gold-soft); }
 .admin-layout .admin-heading .admin-back-button:hover { border-color: var(--brand-gold); }
 
-/* Keep the requested violet customer canvas and network bundle colors intact. */
-.customer-storefront { --brand-customer-violet: #241331; }
+/* Warm gold customer canvas; preserve the established network bundle colors. */
+.customer-storefront { --brand-customer-gold: #f3b900; --brand-customer-gold-light: #ffdf35; }
 .store-bundles .store-bundle,.network-category.mtn,.network-category.at,
 .network-category.telecel,.airtime-network-options button.mtn.active,
 .airtime-network-options button.at.active,.airtime-network-options button.telecel.active { color: inherit; }

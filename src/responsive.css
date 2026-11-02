@@ -404,35 +404,40 @@ body,
 .public-announcements .public-update-cta:hover { background: #f1b900; color: #090806; }
 .public-announcements .public-update-cta svg { width: 15px; height: 15px; }
 .public-announcements .public-update-cta-label { cursor: default; }
-/* Customer storefront violet canvas keeps the white announcement cards distinct. */
+/* Gold customer canvas inspired by the CheapDataBundle mark. Keep announcement panels white for contrast. */
 .customer-storefront,
 .customer-storefront .shop-header,
-.customer-storefront .shop-content { background: #241331; color: #f7f2fb; }
-.customer-storefront .shop-header { border-color: #3d294d; }
-.customer-storefront .shop-brand b { color: #fff; }
-.customer-storefront .shop-brand small { color: #c8b9d4; }
-.customer-storefront .shop-icon-button { background: #2d1b3b; border-color: #4a3558; color: #f6effb; }
-.customer-storefront .shop-section-heading h2 { color: #fff; }
-.customer-storefront .shop-section-heading p { color: #c8b9d4; }
+.customer-storefront .shop-content { background: linear-gradient(145deg,#ffdf29 0%,#ffbf00 34%,#f1a900 67%,#ffda22 100%); color: #17130a; }
+.customer-storefront { background: #f3b900; }
+.customer-storefront .shop-header { background: linear-gradient(110deg,#f9c900,#ffdf35 55%,#e9a900); border-color: #ffe66b; box-shadow: 0 5px 18px #8b5c0038; }
+.customer-storefront .shop-brand b { color: #111; }
+.customer-storefront .shop-brand small { color: #362900; }
+.customer-storefront .shop-icon-button { background: #f9c900; border-color: #fff0a0; color: #111; box-shadow: inset 0 0 0 1px #d99800; }
+.customer-storefront .shop-section-heading h2 { color: #111; }
+.customer-storefront .shop-section-heading p { color: #392d00; }
+.customer-storefront .shop-account-actions { border-color: #fff0a077; }
+.customer-storefront .track-prompt { background: linear-gradient(110deg,#ff6a00,#f04b00); border-color: #ffd34f; color: white; box-shadow: 0 9px 20px #a34b0033; }
+.customer-storefront .track-prompt b,.customer-storefront .track-prompt small { color: white; }
+.customer-storefront .track-clock { color: white; border-color: #ffcf66; }
 .customer-storefront .network-category,
 .customer-storefront .network-category.bigtime-folder,
 .customer-storefront .network-category.afa-folder,
-.customer-storefront .network-category.info-folder { background: #30203f !important; border-color: #4a3558 !important; box-shadow: 0 8px 22px #10091b38; }
-.customer-storefront .category-details h3 { color: #fff; }
-.customer-storefront .category-details p { color: #c8b9d4; }
-.customer-storefront .folder-open-hint { background: #352344; border-color: #604276; color: #e6d4f3; }
-.customer-storefront .shop-bottom-nav { background: #21102ff2; border-color: #4a3558; }
+.customer-storefront .network-category.info-folder { background: linear-gradient(145deg,#ffda29,#f3b700) !important; border-color: #fff1a0 !important; box-shadow: 0 8px 22px #80550038,inset 0 0 0 1px #cf9500; }
+.customer-storefront .category-details h3 { color: #17130a; }
+.customer-storefront .category-details p { color: #3a2c00; }
+.customer-storefront .folder-open-hint { background: #f4b900; border-color: #fff0a0; color: #191300; }
+.customer-storefront .shop-bottom-nav { background: linear-gradient(135deg,#ffd526,#eda900); border-color: #fff0a0; box-shadow: 0 0 22px #80550040; }
 .customer-storefront .shop-bottom-nav button,
-.customer-storefront .shop-bottom-nav>a { background: #30203f; border-color: #4a3558; color: #f1eaf7; }
-.customer-storefront .store-drawer { background: #21102f; color: #f7f2fb; }
-.customer-storefront .drawer-brand-card { background: #30203f; border-color: #4a3558; }
-.customer-storefront .drawer-brand-card b { color: #fff; }
-.customer-storefront .drawer-brand-card small { color: #c8b9d4; }
+.customer-storefront .shop-bottom-nav>a { background: linear-gradient(145deg,#ffdc35,#f1b600); border-color: #fff0a0; color: #17130a; }
+.customer-storefront .store-drawer { background: linear-gradient(160deg,#ffd923,#efae00); color: #17130a; }
+.customer-storefront .drawer-brand-card { background: #ffda25; border-color: #fff0a0; }
+.customer-storefront .drawer-brand-card b { color: #111; }
+.customer-storefront .drawer-brand-card small { color: #392d00; }
 .customer-storefront .drawer-links>button,
-.customer-storefront .drawer-links>a { background: #30203f; color: #f1eaf7; }
-.customer-storefront .shop-footer { background: #21102f; color: #c8b9d4; }
+.customer-storefront .drawer-links>a { background: #ffdc2e; color: #17130a; }
+.customer-storefront .shop-footer { background: #e8a900; color: #281d00; }
 .customer-storefront .shop-footer strong,
-.customer-storefront .shop-footer span { color: #e1c5f6; }
+.customer-storefront .shop-footer span { color: #17130a; }
 /* Agent sidebar follows the compact desktop reference while keeping every tool link. */
 .agent-portal.agent-dashboard-active { grid-template-columns: 238px minmax(0,1fr); }
 .agent-dashboard-active .agent-sidebar { padding: 16px 15px 17px; background: #203450; }
