@@ -1,4 +1,4 @@
-# DataShopGH
+# CheapDataBundle
 
 A responsive Ghana data bundle storefront built with React, TypeScript, Tailwind CSS, and Supabase Auth/Postgres. Prices are shown in GHS. The interface and database seed data are clearly marked as demonstration data. Test mode does not take payments, credit wallets, or deliver mobile data.
 
