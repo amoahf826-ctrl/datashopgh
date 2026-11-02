@@ -364,4 +364,47 @@
 .ops-datahub-networks{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.ops-datahub-networks>span{display:grid;gap:3px;padding:9px 12px;border:1px solid #e4eaf0;border-radius:10px;background:#f8fafc;color:#253145;font-size:11px;font-weight:700}.ops-datahub-networks small{color:#778294;font-size:9px;font-weight:500}
 .help-library{display:grid;gap:14px;margin-top:22px;padding-top:20px;border-top:1px solid #e9e2ef}.help-library-heading{display:flex;align-items:center;gap:11px}.help-library-heading>svg{width:40px;height:40px;padding:10px;box-sizing:border-box;border-radius:12px;background:#f0e8fa;color:#6d28d9}.help-library-heading h2{margin:0;color:#211536;font:750 16px Manrope,sans-serif}.help-library-heading p{margin:4px 0 0;color:#776d82;font-size:11px}.help-library-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.help-library-item{min-width:0;overflow:hidden;border:1px solid #e8e0ef;border-radius:16px;background:#fff;box-shadow:0 6px 18px #21153608}.help-library-item>video{display:block;width:100%;max-height:280px;background:#100a18;object-fit:contain}.help-library-item>div{padding:14px}.help-library-item .help-library-icon{display:grid;place-items:center;width:36px;height:36px;margin:12px 0 0 13px;border-radius:11px;background:#f2eafa;color:#6d28d9}.help-item-kind{display:flex;align-items:center;gap:5px;color:#7b42b4;font-size:9px;font-weight:800;letter-spacing:.08em}.help-library-item h3{margin:7px 0;color:#211536;font:750 14px Manrope,sans-serif}.help-library-item p{margin:0;color:#6e6877;font-size:12px;line-height:1.6;white-space:pre-wrap}.public-shop-update>video.public-shop-update-image{display:block;width:100%;max-height:420px;object-fit:contain;background:#100a18;border-radius:15px;margin:12px 0}.admin-published-update>video{display:block;width:100%;max-height:300px;object-fit:contain;background:#100a18;border-radius:16px;margin:12px 0}
 @media(max-width:760px){.help-library-list{grid-template-columns:1fr}}
+
+/* CHEAPDATABUNDLE public customer storefront: bright white surfaces and legible dark text. */
+.customer-storefront,.customer-storefront .shop-header,.customer-storefront .shop-content{background:#fff;color:#202938}
+.customer-storefront .shop-header{border-color:#e8eaf0}
+.customer-storefront .shop-brand b{color:#111827}
+.customer-storefront .shop-brand small{color:#667085}
+.customer-storefront .shop-brand-icon.customer-brand-image{width:48px;height:48px;overflow:hidden;border:1px solid #e2e5eb;border-radius:12px;background:#05070d;gap:0}
+.customer-storefront .customer-brand-image img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.customer-storefront .shop-icon-button{background:#fff;border-color:#e2e5eb;color:#273244}
+.customer-storefront .shop-section-heading h2{color:#172033}
+.customer-storefront .shop-section-heading p{color:#667085}
+.customer-storefront .network-category,.customer-storefront .network-category.bigtime-folder,.customer-storefront .network-category.afa-folder,.customer-storefront .network-category.info-folder{background:#fff!important;border-color:#e4e7ec!important;box-shadow:0 8px 22px #1820330b}
+.customer-storefront .category-details h3{color:#172033}
+.customer-storefront .category-details p{color:#788292}
+.customer-storefront .folder-open-hint{background:#fff;border-color:#e2e5eb;color:#4c1d95}
+.customer-storefront .shop-bottom-nav{background:#fffffff2;border-color:#e5e7eb}
+.customer-storefront .shop-bottom-nav button,.customer-storefront .shop-bottom-nav>a{background:#fff;border-color:#e5e7eb;color:#344054}
+.customer-storefront .store-drawer{background:#fff;color:#202938}
+.customer-storefront .drawer-brand-card{background:#fff;border-color:#e5e7eb}
+.customer-storefront .drawer-brand-card b{color:#172033}
+.customer-storefront .drawer-links>button,.customer-storefront .drawer-links>a{color:#344054}
+.customer-storefront .shop-footer{background:#fff;color:#667085}
+.customer-storefront .shop-footer strong,.customer-storefront .shop-footer span{color:#4c1d95}
+
+/* Agent Buy Data carrier colors and complete bulk/Excel order controls. */
+.agent-network-tabs button.active.network-tab-mtn{background:#f5c400;color:#211a00;box-shadow:0 2px 7px #9f7e0026}
+.agent-network-tabs button.active.network-tab-at{background:#2365c8;color:#fff;box-shadow:0 2px 7px #174b9b33}
+.agent-network-tabs button.active.network-tab-telecel{background:#d92332;color:#fff;box-shadow:0 2px 7px #9e152033}
+.agent-package-card.mtn{border-color:#d5a900;background:#f5c400;color:#211a00}
+.agent-package-card.at{border-color:#174b9b;background:#2365c8;color:#fff}
+.agent-package-card.telecel{border-color:#a91624;background:#d92332;color:#fff}
+.agent-package-card.mtn .agent-package-meta b{background:#ffdf4f;color:#302700}
+.agent-package-card.at .agent-package-meta b,.agent-package-card.telecel .agent-package-meta b{background:#ffffff28;color:#fff}
+.agent-package-card.mtn .agent-package-meta span,.agent-package-card.mtn h2,.agent-package-card.mtn p,.agent-package-card.mtn>strong{color:#211a00}
+.agent-package-card.at .agent-package-meta span,.agent-package-card.at h2,.agent-package-card.at p,.agent-package-card.at>strong,.agent-package-card.telecel .agent-package-meta span,.agent-package-card.telecel h2,.agent-package-card.telecel p,.agent-package-card.telecel>strong{color:#fff}
+.agent-package-card>button{background:#0b1830;color:#fff}
+.agent-package-card.mtn>button{background:#0b1830;color:#ffdb32}
+.agent-package-card.at>button,.agent-package-card.telecel>button{background:#08152d;color:#fff}
+.agent-buy-modes button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.agent-excel-picker{position:relative;display:flex!important;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:14px;border:1px dashed #a78bca;border-radius:13px;background:#fff;color:#5b21a5;cursor:pointer}
+.agent-excel-picker small{width:100%;padding-left:28px;color:#667085;font-size:11px;font-weight:500}
+.agent-excel-picker input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+@media(max-width:700px){.agent-buy-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.agent-buy-modes button{padding:0 5px;font-size:11px}.agent-network-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .hubnet-number-status{display:inline-flex;align-items:center;justify-self:start;padding:5px 9px;border-radius:999px;background:#f1f3f6;color:#596579;font-size:10px;font-weight:800;text-transform:capitalize}.hubnet-verified{background:#e4f8ed;color:#138146}.hubnet-unverified,.hubnet-invalid{background:#fff0ee;color:#b42318}.hubnet-queued{background:#fff5dc;color:#9a6100}.agent-order-heading>h3{margin:17px 0 7px;font:750 14px Manrope,sans-serif}
