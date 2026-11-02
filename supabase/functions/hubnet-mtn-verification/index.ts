@@ -57,9 +57,9 @@ Deno.serve(async (request: Request) => {
 
   let body: { numbers?: unknown };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }
-  if (!Array.isArray(body.numbers) || body.numbers.length < 1 || body.numbers.length > 25 ||
+  if (!Array.isArray(body.numbers) || body.numbers.length < 1 || body.numbers.length > 30 ||
       body.numbers.some((number) => typeof number !== "string" || !/^0\d{9}$/.test(number))) {
-    return json(400, { error: "Submit 1 to 25 valid 10-digit Ghanaian MTN numbers per check." });
+    return json(400, { error: "Submit 1 to 30 valid 10-digit Ghanaian MTN numbers per check." });
   }
   const numbers = [...new Set(body.numbers as string[])];
   const { data: submissions, error: submissionsError } = await service.from("agent_number_submissions")
@@ -83,13 +83,15 @@ Deno.serve(async (request: Request) => {
           signal: AbortSignal.timeout(12000),
         });
         const payload = await response.json().catch(() => null);
-        const data = payload?.response?.data ?? payload?.data;
+        const envelope = payload?.response ?? payload;
+        const data = envelope?.data ?? payload?.data;
         const status = String(data?.status ?? "").toLowerCase();
-        if (!response.ok || payload?.status !== true || !["verified","unverified","queued","invalid"].includes(status) ||
+        if (!response.ok || !(envelope?.status === true || envelope?.status === "success" || payload?.status === true || payload?.status === "success") || !["verified","unverified","queued","invalid"].includes(status) ||
             (data?.number != null && normalizedNumber(data.number) !== number)) {
-          results[index] = { number, error: payload?.message ?? payload?.response?.message ?? `Hubnet returned HTTP ${response.status}.` };
+          results[index] = { number, error: envelope?.message ?? payload?.message ?? `Hubnet returned HTTP ${response.status}.` };
         } else {
-          results[index] = { number, status: status as Result["status"], request_id: typeof payload.request_id === "string" ? payload.request_id : null };
+          const requestId = envelope?.request_id ?? payload?.request_id;
+          results[index] = { number, status: status as Result["status"], request_id: typeof requestId === "string" ? requestId : null };
         }
       } catch {
         results[index] = { number, error: "Hubnet did not respond. Retry this number." };
@@ -100,11 +102,11 @@ Deno.serve(async (request: Request) => {
 
   const checkedAt = new Date().toISOString();
   for (const result of results) {
-    if (!result.status) continue;
     const { error } = await service.from("agent_number_submissions").update({
-      hubnet_status: result.status, hubnet_request_id: result.request_id ?? null, hubnet_checked_at: checkedAt,
+      hubnet_status: result.status ?? null, hubnet_error: result.error ?? null,
+      hubnet_request_id: result.request_id ?? null, hubnet_checked_at: checkedAt,
     }).eq("agent_id", authData.user.id).eq("phone_number", result.number);
-    if (error) result.error = "Hubnet responded, but the verification result could not be saved. Retry this number.";
+    if (error) result.error = "Hubnet responded, but the result could not be saved. Apply the latest number verification migration, then retry.";
   }
   return json(200, { success: results.every((result) => !!result.status), results, checked_at: checkedAt,
     message: "MTN eTopup beneficiary check complete. Queued numbers may be checked again after two minutes." });
