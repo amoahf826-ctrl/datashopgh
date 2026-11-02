@@ -108,3 +108,41 @@ body { color: var(--brand-ink); background: var(--brand-paper); }
   .admin-brand-mark { width: 56px; height: 56px; }
   .agent-brand-mark img,.agent-dashboard-active .agent-brand-mark img { width: 46px; height: 46px; }
 }
+
+/* Site-wide logo gradients. Keep purpose-built network cards, announcement cards,
+   and the independently themed Admin and Agent dashboards on their own styles. */
+body { background: linear-gradient(135deg,#fff9df 0%,#f7edd1 48%,#fff3d1 100%); }
+.app-shell { background: linear-gradient(145deg,#fffaf0 0%,#f8efd8 48%,#fff7e6 100%); }
+.header { background: linear-gradient(105deg,#fffdf4 0%,#fff4cf 54%,#f7d566 100%); border-bottom-color: #e9c34d; }
+.signup-button,.primary:not(.admin-layout .primary) { background: linear-gradient(110deg,#111 0%,#292016 45%,#d88c00 100%); color: #fff6ce; box-shadow: 0 7px 18px #9a680033; }
+.signup-button:hover,.primary:not(.admin-layout .primary):hover { background: linear-gradient(110deg,#090909 0%,#8a4d00 50%,#ffc629 100%); color: #fff; }
+.testbar { background: linear-gradient(90deg,#fff2bf,#fffaf0 52%,#f4d76d); color: #604500; }
+.hero-art .phone-card,.benefits,.feature-card,.faq-item,.panel,.metric-card,.dashboard-stats article,.dashboard-recent { background: linear-gradient(145deg,#fffefa 0%,#fff8e5 56%,#f9e7a7 100%); border-color: #e8cf75; }
+.hero-art .phone-card { box-shadow: 0 18px 45px #8b5b0020; }
+.hero h1 span,.eyebrow,.hero-proof b { color: #a36a00; }
+.nav button.active { color: #201700; }
+.nav button.active:after { background: linear-gradient(90deg,#f5bd19,#f97316); }
+.brand-gh { color: #b96f00; }
+.brand-mark { background: linear-gradient(145deg,#17120a,#6f4700,#f5bd19); }
+.brand-mark span { background: linear-gradient(180deg,#fff3a3,#f5bd19); }
+
+/* Carry the same gold-to-orange foil through the uncustomized storefront chrome. */
+.customer-storefront,
+.customer-storefront .shop-content { background-color: #f3b900; background-image: linear-gradient(145deg,#ffdf35 0%,#ffc400 34%,#eea700 70%,#ffda29 100%); }
+.customer-storefront .shop-header { background: linear-gradient(110deg,#efab00 0%,#ffdf35 44%,#f2b400 72%,#fff0a0 100%); }
+.customer-storefront .network-category:not(.mtn):not(.at):not(.telecel),
+.customer-storefront .network-category.bigtime-folder,
+.customer-storefront .network-category.afa-folder,
+.customer-storefront .network-category.info-folder { background-image: linear-gradient(135deg,#ffe45b 0%,#ffd11b 44%,#f1ae00 100%) !important; }
+.customer-storefront .shop-bottom-nav { background-image: linear-gradient(115deg,#ffdf35,#f8ba00 55%,#e8a000); }
+.customer-storefront .store-drawer { background-image: linear-gradient(155deg,#ffdf35,#f0ad00 75%,#d88700); }
+.customer-storefront .shop-account-actions .shop-register { background-image: linear-gradient(105deg,#4c1d95 0%,#7c22c8 60%,#f97316 100%); }
+.customer-storefront .shop-account-actions .shop-login { background: linear-gradient(105deg,#090909,#252019 72%,#593b08); color: #fff; }
+.customer-storefront .track-prompt { background-image: linear-gradient(105deg,#f97316 0%,#ed4d00 55%,#c93c00 100%); }
+.customer-storefront .public-shop-update,
+.customer-storefront .public-shop-update.warning,
+.customer-storefront .public-shop-update.success { background-color: #fff; background-image: none; }
+.customer-storefront .store-bundle,
+.customer-storefront .network-category.mtn,
+.customer-storefront .network-category.at,
+.customer-storefront .network-category.telecel { background-image: none; }
