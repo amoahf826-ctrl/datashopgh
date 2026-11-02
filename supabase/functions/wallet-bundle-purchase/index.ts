@@ -30,7 +30,9 @@ Deno.serve(async (request: Request) => {
   const anonKey = readKey("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
   const serviceKey = readKey("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
   const datahubKey = Deno.env.get("DATAHUB_API_KEY")?.trim();
-  if (!supabaseUrl || !anonKey || !serviceKey || !datahubKey) {
+  const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
+  const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://console.hubnet.app").replace(/\/+$/, "");
+  if (!supabaseUrl || !anonKey || !serviceKey) {
     return json(503, { error: "Wallet bundle delivery is not fully configured on the server." });
   }
 
@@ -48,6 +50,16 @@ Deno.serve(async (request: Request) => {
   }
 
   const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: providerSetting, error: providerSettingError } = await service.from("platform_settings")
+    .select("value").eq("key", "active_bundle_provider").maybeSingle();
+  if (providerSettingError) return json(503, { error: "Could not read the active bundle provider." });
+  const activeProvider = providerSetting?.value?.provider === "hubnet" ? "hubnet" : "datahub";
+  if (activeProvider === "datahub" && !datahubKey) return json(503, { error: "DataHub wallet delivery is not configured on the server." });
+  if (activeProvider === "hubnet" && !hubnetToken) return json(503, { error: "Hubnet wallet delivery is not configured on the server." });
+  if (activeProvider === "hubnet") {
+    try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "console.hubnet.app" || base.username || base.password) throw new Error(); }
+    catch { return json(503, { error: "HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin." }); }
+  }
   const { data: sales, error: settingError } = await service.from("platform_settings")
     .select("value").eq("key", "storefront_live_sales").maybeSingle();
   if (settingError || sales?.value?.enabled !== true) return json(503, { error: "Live bundle sales are currently unavailable." });
@@ -69,6 +81,7 @@ Deno.serve(async (request: Request) => {
     return json(status, { error: message });
   }
   if (!order.created) return json(200, { success: true, ...order, duplicate: true });
+  await service.from("orders").update({ delivery_provider: activeProvider }).eq("id", order.order_id);
 
   const { data: orderRecord } = await service.from("orders").select("bundle_id").eq("id", order.order_id).maybeSingle();
   const { data: plan } = orderRecord?.bundle_id
@@ -90,21 +103,43 @@ Deno.serve(async (request: Request) => {
   }
 
   const capacity = String(Number((Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1 : 0.001)).toFixed(3)));
+  const webhook = `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/hubnet-webhook`;
   try {
-    const delivery = await fetch("https://app.datahubgh.com/api/external/data-purchase", {
-      method: "POST",
-      headers: { "X-API-Key": datahubKey, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ networkKey, recipient: body.recipient_phone, capacity }),
-      signal: AbortSignal.timeout(15000),
-    });
+    let delivery: Response;
+    if (activeProvider === "datahub") {
+      delivery = await fetch("https://app.datahubgh.com/api/external/data-purchase", {
+        method: "POST",
+        headers: { "X-API-Key": datahubKey!, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ networkKey, recipient: body.recipient_phone, capacity }),
+        signal: AbortSignal.timeout(15000),
+      });
+    } else {
+      const hubnetPath = networkKey === "AT_BIGTIME" ? "big-time-new-transaction"
+        : networkKey === "TELECEL" ? "telecel-new-transaction"
+        : networkKey === "AT_PREMIUM" ? "at-new-transaction"
+        : "mtn-new-transaction";
+      const volume = String(Math.round(Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1000 : 1)));
+      const authHeader = /^Bearer\s+/i.test(hubnetToken!) ? hubnetToken! : `Bearer ${hubnetToken}`;
+      delivery = await fetch(`${hubnetBase}/live/api/context/business/transaction/${hubnetPath}`, {
+        method: "POST",
+        headers: { token: authHeader, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ phone: body.recipient_phone, volume, reference: deliveryReference, webhook }),
+        signal: AbortSignal.timeout(15000),
+      });
+    }
     const result = await delivery.json().catch(() => null);
-    const resultData = result?.data ?? {};
+    const envelope = activeProvider === "hubnet" ? (result?.response ?? result) : result;
+    const resultData = envelope?.data ?? result?.data ?? {};
+    const accepted = activeProvider === "hubnet"
+      ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
+      : result?.success === true;
     const resultStatus = String(resultData.status ?? "").toUpperCase();
-    if (delivery.ok && result?.success === true && typeof resultData.reference === "string" && ["SUCCESSFUL", "PROCESSING", "PENDING"].includes(resultStatus)) {
-      const delivered = resultStatus === "SUCCESSFUL";
+    if (delivery.ok && accepted && (activeProvider === "hubnet" || (typeof resultData.reference === "string" && ["SUCCESSFUL", "PROCESSING", "PENDING"].includes(resultStatus)))) {
+      const delivered = ["SUCCESSFUL", "SUCCESS", "DELIVERED", "COMPLETED"].includes(resultStatus);
       const deliveryStatus = delivered ? "delivered" : "processing";
       await service.rpc("update_live_order_delivery", {
-        p_reference: deliveryReference, p_delivery_status: deliveryStatus, p_provider_transaction_id: resultData.reference,
+        p_reference: deliveryReference, p_delivery_status: deliveryStatus,
+        p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference,
       });
       return json(200, { success: true, ...order, delivery_status: deliveryStatus,
         message: delivered ? "Data delivered successfully." : "Order accepted and is being processed." });
