@@ -384,12 +384,27 @@ body,
 .public-announcements .announcement-text-only .notice-copy { padding: 12px 0 0; }
 .public-announcements .announcement-with-image .notice-copy { padding-top: 12px; }
 .agent-dashboard-announcements,.dashboard-announcements { margin: 18px 0; }
-.agent-dashboard-announcements .public-shop-update { border-left: 4px solid #f97316; }
-.agent-dashboard-announcements .public-shop-update.success { border-left-color: #18b56a; }
-.agent-dashboard-announcements .public-shop-update.warning { border-left-color: #e7a400; }
+.public-announcements .public-shop-update { padding: 18px 20px; border: 1px solid #dfe5ec; border-radius: 20px; background: #fff; color: #172033; box-shadow: 0 7px 22px #14233b0a; }
+.public-announcements .announcement-brandline { display: block; color: #07956a; font: 800 9px 'DM Sans',sans-serif; letter-spacing: .13em; text-transform: uppercase; }
+.public-announcements .announcement-copy { margin-top: 10px; }
+.public-announcements .announcement-copy b { display: block; color: #172033; font: 750 17px/1.35 Manrope,sans-serif; }
+.public-announcements .announcement-copy p { margin: 3px 0 0; color: #46546b; font: 450 13px/1.55 'DM Sans',sans-serif; white-space: pre-wrap; }
+.public-announcements .public-shop-update-image { display: block; width: min(100%,560px); max-height: 285px; margin: 14px auto 0; border-radius: 8px; object-fit: contain; background: transparent; }
+.public-announcements .announcement-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+.public-announcements .announcement-meta span { display: inline-flex; align-items: center; min-height: 29px; padding: 0 11px; border-radius: 20px; background: #eef2ff; color: #4840c8; font: 750 9px 'DM Sans',sans-serif; text-transform: uppercase; letter-spacing: .02em; }
+.public-announcements .announcement-meta span:nth-child(2) { background: #fff1c9; color: #985800; }
+.public-announcements .announcement-meta span.tone-success { background: #e4f8ed; color: #07864a; }
+.public-announcements .announcement-meta span.tone-warning { background: #fff1c9; color: #985800; }
+.public-announcements .announcement-meta span.tone-info { background: #eef2ff; color: #4840c8; }
+.public-announcements .announcement-dates { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 13px; color: #728097; font: 450 10px/1.5 'DM Sans',sans-serif; }
+.public-announcements .public-update-cta { margin-top: 14px; }
 @media(max-width:620px) {
   .admin-announcement-tabs { grid-template-columns: 1fr; }
   .public-announcements { gap: 11px; }
+  .public-announcements .public-shop-update { padding: 15px; border-radius: 17px; }
+  .public-announcements .announcement-copy b { font-size: 15px; }
+  .public-announcements .announcement-copy p { font-size: 12px; }
+  .public-announcements .public-shop-update-image { max-height: 250px; }
   .agent-dashboard-announcements,.dashboard-announcements { margin: 14px 0; }
 }
 .agent-cashout-page { display: grid; gap: 16px; }

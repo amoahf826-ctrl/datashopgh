@@ -1,4 +1,4 @@
-import { ArrowRight, ShieldCheck } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export type PublicAnnouncement = {
   id: string;
@@ -10,6 +10,10 @@ export type PublicAnnouncement = {
   button_text: string | null;
   button_link: string | null;
   tone: string;
+  show_on?: string;
+  priority?: number;
+  starts_at?: string | null;
+  ends_at?: string | null;
 };
 
 const rebrand = (value: string) => value.replace(/databundleshops(?:\.com)?/gi, 'CheapDataBundle');
@@ -17,12 +21,17 @@ const rebrand = (value: string) => value.replace(/databundleshops(?:\.com)?/gi, 
 export default function PublicAnnouncements({ updates, className = '' }: { updates: PublicAnnouncement[]; className?: string }) {
   if (!updates.length) return null;
 
+  const dateLabel = (value?: string | null) => value ? new Date(value).toLocaleString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No end date';
+
   return <section className={`public-announcements ${className}`} aria-label="Public announcements">
     {updates.map(update => <article className={`shop-notice public-shop-update ${update.image_url||update.video_url ? 'announcement-with-image' : 'announcement-text-only'}`} key={update.id}>
-      <span className="notice-chip"><ShieldCheck/> CheapDataBundle · {update.video_url ? 'VIDEO ADVERT' : update.image_url ? 'PUBLIC ADVERT' : 'PUBLIC ANNOUNCEMENT'}</span>
+      <span className="announcement-brandline">CheapDataBundle · Official Announcement</span>
+      <div className="announcement-copy"><b>{rebrand(update.title)}</b><p>{rebrand(update.message)}</p></div>
       {update.image_url && <img className="public-shop-update-image" src={update.image_url} alt={rebrand(update.title)} loading="lazy"/>}
       {update.video_url && <video className="public-shop-update-image" controls playsInline preload="metadata" src={update.video_url}>{rebrand(update.title)}</video>}
-      <div className="notice-copy"><b>{rebrand(update.title)}</b><small>{rebrand(update.message)}</small>{update.button_text && update.button_link && <a className="public-update-cta" href={update.button_link} target={update.button_link.startsWith('http') ? '_blank' : undefined} rel={update.button_link.startsWith('http') ? 'noopener noreferrer' : undefined}>{update.button_text}<ArrowRight/></a>}</div>
+      <div className="announcement-meta"><span>{update.video_url ? 'Video advertisement' : update.image_url ? 'Image advertisement' : 'Text announcement'}</span><span>{update.show_on === 'everywhere' || !update.show_on ? 'All dashboards' : update.show_on}</span><span className={`tone-${update.tone||'info'}`}>{update.tone||'Info'}</span><span>Priority {Number(update.priority)||0}</span>{update.button_text&&<span>Button: {rebrand(update.button_text)}</span>}</div>
+      <div className="announcement-dates"><span>Start: {dateLabel(update.starts_at)}</span><span>End: {dateLabel(update.ends_at)}</span></div>
+      {update.button_text && update.button_link && <a className="public-update-cta" href={update.button_link} target={update.button_link.startsWith('http') ? '_blank' : undefined} rel={update.button_link.startsWith('http') ? 'noopener noreferrer' : undefined}>{update.button_text}<ArrowRight/></a>}
     </article>)}
   </section>;
 }
