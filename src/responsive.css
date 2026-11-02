@@ -398,6 +398,72 @@ body,
 .public-announcements .announcement-meta span.tone-info { background: #eef2ff; color: #4840c8; }
 .public-announcements .announcement-dates { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 13px; color: #728097; font: 450 10px/1.5 'DM Sans',sans-serif; }
 .public-announcements .public-update-cta { margin-top: 14px; }
+/* Customer storefront violet canvas keeps the white announcement cards distinct. */
+.customer-storefront,
+.customer-storefront .shop-header,
+.customer-storefront .shop-content { background: #241331; color: #f7f2fb; }
+.customer-storefront .shop-header { border-color: #3d294d; }
+.customer-storefront .shop-brand b { color: #fff; }
+.customer-storefront .shop-brand small { color: #c8b9d4; }
+.customer-storefront .shop-icon-button { background: #2d1b3b; border-color: #4a3558; color: #f6effb; }
+.customer-storefront .shop-section-heading h2 { color: #fff; }
+.customer-storefront .shop-section-heading p { color: #c8b9d4; }
+.customer-storefront .network-category,
+.customer-storefront .network-category.bigtime-folder,
+.customer-storefront .network-category.afa-folder,
+.customer-storefront .network-category.info-folder { background: #30203f !important; border-color: #4a3558 !important; box-shadow: 0 8px 22px #10091b38; }
+.customer-storefront .category-details h3 { color: #fff; }
+.customer-storefront .category-details p { color: #c8b9d4; }
+.customer-storefront .folder-open-hint { background: #352344; border-color: #604276; color: #e6d4f3; }
+.customer-storefront .shop-bottom-nav { background: #21102ff2; border-color: #4a3558; }
+.customer-storefront .shop-bottom-nav button,
+.customer-storefront .shop-bottom-nav>a { background: #30203f; border-color: #4a3558; color: #f1eaf7; }
+.customer-storefront .store-drawer { background: #21102f; color: #f7f2fb; }
+.customer-storefront .drawer-brand-card { background: #30203f; border-color: #4a3558; }
+.customer-storefront .drawer-brand-card b { color: #fff; }
+.customer-storefront .drawer-brand-card small { color: #c8b9d4; }
+.customer-storefront .drawer-links>button,
+.customer-storefront .drawer-links>a { background: #30203f; color: #f1eaf7; }
+.customer-storefront .shop-footer { background: #21102f; color: #c8b9d4; }
+.customer-storefront .shop-footer strong,
+.customer-storefront .shop-footer span { color: #e1c5f6; }
+/* Agent sidebar follows the compact desktop reference while keeping every tool link. */
+.agent-portal.agent-dashboard-active { grid-template-columns: 238px minmax(0,1fr); }
+.agent-dashboard-active .agent-sidebar { padding: 16px 15px 17px; background: #203450; }
+.agent-dashboard-active .agent-brand-mark { gap: 9px; padding: 0 2px 14px; font-size: 14px; }
+.agent-dashboard-active .agent-brand-mark img { width: 31px; height: 31px; border-radius: 9px; object-fit: cover; }
+.agent-dashboard-active .agent-brand-mark:before { display: none; }
+.agent-dashboard-active .agent-user-summary { grid-template-columns: 36px minmax(0,1fr); justify-items: stretch; align-items: center; gap: 2px 9px; margin: 0 0 12px; padding: 8px; border: 1px solid #ffffff18; border-radius: 12px; background: #ffffff09; text-align: left; }
+.agent-dashboard-active .agent-avatar { grid-column: 1; grid-row: 1 / span 2; width: 34px; height: 34px; margin: 0; font-size: 14px; }
+.agent-dashboard-active .agent-profile-meta b { font-size: 11px; }
+.agent-dashboard-active .agent-profile-meta small { display: none; }
+.agent-dashboard-active .agent-user-summary .agent-referral-id { display: none; }
+.agent-dashboard-active .agent-user-summary .agent-sidebar-email { grid-column: 2; padding: 0; overflow: hidden; color: #b9c8dd; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.agent-dashboard-active .agent-sidebar nav.agent-reference-nav { display: grid; align-content: start; gap: 4px; margin: 0; padding: 6px 0 10px; }
+.agent-dashboard-active .agent-reference-nav>button { width: 100%; min-height: 41px; gap: 10px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: #d6e0f0; text-align: left; font: 550 12px 'DM Sans',sans-serif; }
+.agent-dashboard-active .agent-reference-nav>button:hover,
+.agent-dashboard-active .agent-reference-nav>button.active { background: #2864e8; color: #fff; }
+.agent-dashboard-active .agent-reference-nav>button.agent-nav-toggle { background: transparent; }
+.agent-dashboard-active .agent-reference-nav>button.agent-nav-toggle:hover,
+.agent-dashboard-active .agent-reference-nav>button.agent-nav-toggle[aria-expanded="true"] { background: #ffffff0c; color: #fff; }
+.agent-dashboard-active .agent-reference-nav>button.agent-nav-toggle>svg:last-child { margin-left: auto; transition: transform .15s ease; }
+.agent-dashboard-active .agent-reference-nav>button.agent-nav-toggle>svg:last-child.expanded { transform: rotate(180deg); }
+.agent-dashboard-active .agent-nav-submenu { display: grid; gap: 3px; margin: -1px 0 4px 13px; padding-left: 9px; border-left: 1px solid #ffffff28; }
+.agent-dashboard-active .agent-nav-submenu>button { min-height: 35px; display: flex; align-items: center; gap: 9px; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: #c5d2e5; text-align: left; font: 500 11px 'DM Sans',sans-serif; cursor: pointer; }
+.agent-dashboard-active .agent-nav-submenu>button:hover,
+.agent-dashboard-active .agent-nav-submenu>button.active { background: #2864e8; color: #fff; }
+.agent-dashboard-active .agent-sidebar-logout { width: 100%; min-height: 40px; justify-content: flex-start; align-self: stretch; margin: 8px 0 0; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #ff4b52; font-size: 12px; }
+.agent-dashboard-active .agent-sidebar-logout:hover { background: #ffffff0c; }
+.agent-portal.agent-dashboard-active { background: #050505; }
+.agent-dashboard-active .agent-sidebar { background: #000; border-right-color: #252525; }
+.dashboard-route-loading { min-height: min(70vh,680px); display: grid; place-items: center; color: #e0e9f8; font: 650 14px 'DM Sans',sans-serif; }
+@media(max-width:850px) {
+ .agent-portal.agent-dashboard-active { grid-template-columns: minmax(0,1fr); }
+ .agent-dashboard-active .agent-sidebar { width: min(300px,86vw); padding: 19px 15px 16px; }
+ .agent-dashboard-active .agent-sidebar nav.agent-reference-nav { display: grid; overflow-y: auto; overflow-x: hidden; }
+ .agent-dashboard-active .agent-reference-nav>button { flex: none; width: 100%; }
+ .agent-dashboard-active .agent-sidebar-logout { position: static; width: 100%; min-height: 42px; margin: 8px 0 0; }
+}
 @media(max-width:620px) {
   .admin-announcement-tabs { grid-template-columns: 1fr; }
   .public-announcements { gap: 11px; }
