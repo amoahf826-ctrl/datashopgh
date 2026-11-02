@@ -49,10 +49,10 @@ Deno.serve(async (request: Request) => {
     return reply(401, { error: "Unexpected DataHub webhook headers." });
   }
 
-  const status = String(data.status).toUpperCase();
-  const deliveryStatus = status === "SUCCESSFUL" ? "delivered"
-    : status === "FAILED" ? "failed"
-    : ["PENDING", "PROCESSING"].includes(status) ? "processing" : null;
+  const status = String(data.status).trim().toUpperCase().replace(/[\s-]+/g, "_");
+  const deliveryStatus = ["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(status) ? "delivered"
+    : ["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(status) ? "failed"
+    : ["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(status) ? "processing" : null;
   if (!deliveryStatus) return reply(200, { received: true, ignored: true });
 
   const service = createClient(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } });

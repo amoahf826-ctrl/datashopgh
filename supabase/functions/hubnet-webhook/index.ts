@@ -39,10 +39,10 @@ Deno.serve(async (request: Request) => {
     const envelope = result?.response ?? result;
     const data = envelope?.data ?? result?.data ?? {};
     if (!checked.ok || !(envelope?.status === true || envelope?.status === "success" || result?.status === true || result?.status === "success")) return json(200, { received: true, verified: false });
-    const state = String(data?.status ?? "").toLowerCase();
-    const deliveryStatus = ["success", "delivered", "completed"].includes(state) ? "delivered"
-      : ["failed", "cancelled"].includes(state) ? "failed"
-      : ["pending", "processing"].includes(state) ? "processing" : null;
+    const state = String(data?.status ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+    const deliveryStatus = ["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(state) ? "delivered"
+      : ["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(state) ? "failed"
+      : ["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(state) ? "processing" : null;
     if (!deliveryStatus) return json(200, { received: true, verified: false });
 
     const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });

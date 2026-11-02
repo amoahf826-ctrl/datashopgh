@@ -9,6 +9,14 @@ const corsHeaders = {
 const json = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: corsHeaders });
 
+function normalizeDeliveryStatus(value: unknown): "delivered" | "failed" | "processing" | null {
+  const status = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(status)) return "delivered";
+  if (["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(status)) return "failed";
+  if (["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(status)) return "processing";
+  return null;
+}
+
 function readKey(legacyName: string, collectionName: string): string | undefined {
   const legacy = Deno.env.get(legacyName)?.trim();
   if (legacy) return legacy;
@@ -133,16 +141,24 @@ Deno.serve(async (request: Request) => {
     const accepted = activeProvider === "hubnet"
       ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
       : result?.success === true;
-    const resultStatus = String(resultData.status ?? "").toUpperCase();
-    if (delivery.ok && accepted && (activeProvider === "hubnet" || (typeof resultData.reference === "string" && ["SUCCESSFUL", "PROCESSING", "PENDING"].includes(resultStatus)))) {
-      const delivered = ["SUCCESSFUL", "SUCCESS", "DELIVERED", "COMPLETED"].includes(resultStatus);
-      const deliveryStatus = delivered ? "delivered" : "processing";
+    const providerStatus = normalizeDeliveryStatus(resultData.status ?? resultData.delivery_status ?? resultData.orderStatus ?? resultData.order_status);
+    if (delivery.ok && accepted && (activeProvider === "hubnet" || typeof resultData.reference === "string")) {
+      if (providerStatus === "failed") {
+        await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "failed",
+          p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference });
+        const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
+        return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
+          message: refundError ? "The active provider reported a failed order. Contact support to reconcile the wallet." : "The active provider reported a failed order; your wallet was refunded." });
+      }
+      const deliveryStatus = providerStatus ?? "unknown";
       await service.rpc("update_live_order_delivery", {
         p_reference: deliveryReference, p_delivery_status: deliveryStatus,
         p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference,
       });
       return json(200, { success: true, ...order, delivery_status: deliveryStatus,
-        message: delivered ? "Data delivered successfully." : "Order accepted and is being processed." });
+        message: deliveryStatus === "delivered" ? "Data delivered successfully."
+          : deliveryStatus === "processing" ? "The active provider accepted the order and is processing it."
+          : "The active provider accepted the order. Its final status is not available yet; check order history shortly." });
     }
 
     if (delivery.status >= 400 && delivery.status < 500) {

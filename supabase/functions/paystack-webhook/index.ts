@@ -3,6 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const response = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+function normalizeDeliveryStatus(value: unknown): "delivered" | "failed" | "processing" | null {
+  const status = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(status)) return "delivered";
+  if (["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(status)) return "failed";
+  if (["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(status)) return "processing";
+  return null;
+}
+
 function readSupabaseServiceKey(): string | undefined {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
   if (legacy) return legacy;
@@ -162,13 +170,12 @@ Deno.serve(async (request: Request) => {
     const accepted = activeProvider === "hubnet"
       ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
       : result?.success === true;
-    const resultStatus = String(resultData.status ?? resultData.delivery_status ?? "").toUpperCase();
-    if (delivery.ok && accepted && (activeProvider === "hubnet" || (typeof resultData.reference === "string" && ["SUCCESSFUL", "PROCESSING", "PENDING"].includes(resultStatus)))) {
+    const providerStatus = normalizeDeliveryStatus(resultData.status ?? resultData.delivery_status ?? resultData.orderStatus ?? resultData.order_status);
+    if (delivery.ok && accepted && (providerStatus === "failed" || activeProvider === "hubnet" || typeof resultData.reference === "string")) {
       const transactionReference = resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? claim.delivery_reference;
-      const isDelivered = ["SUCCESSFUL", "SUCCESS", "DELIVERED", "COMPLETED"].includes(resultStatus);
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,
-        p_delivery_status: isDelivered ? "delivered" : "processing",
+        p_delivery_status: providerStatus ?? "unknown",
         p_provider_transaction_id: transactionReference,
       });
     } else if (delivery.ok && result?.success === true) {

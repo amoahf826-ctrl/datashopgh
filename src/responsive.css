@@ -385,8 +385,10 @@ body,
 .public-announcements .announcement-with-image .notice-copy { padding-top: 12px; }
 .agent-dashboard-announcements,.dashboard-announcements { margin: 18px 0; }
 .public-announcements .public-shop-update { padding: 18px 20px; border: 1px solid #dfe5ec; border-radius: 20px; background: #fff; color: #172033; box-shadow: 0 7px 22px #14233b0a; }
+.public-announcements .announcement-text-only { background: linear-gradient(135deg,#e7fff1 0%,#d3f8e4 100%); border-color: #9fe4bd; }
 .public-announcements .announcement-brandline { display: block; color: #07956a; font: 800 9px 'DM Sans',sans-serif; letter-spacing: .13em; text-transform: uppercase; }
 .public-announcements .announcement-copy { margin-top: 10px; }
+.public-announcements .announcement-copy { padding: 13px 15px; border: 1px solid #b5edcb; border-radius: 14px; background: #eafff1; }
 .public-announcements .announcement-copy b { display: block; color: #172033; font: 750 17px/1.35 Manrope,sans-serif; }
 .public-announcements .announcement-copy p { margin: 3px 0 0; color: #46546b; font: 450 13px/1.55 'DM Sans',sans-serif; white-space: pre-wrap; }
 .public-announcements .public-shop-update-image { display: block; width: min(100%,560px); max-height: 285px; margin: 14px auto 0; border-radius: 8px; object-fit: contain; background: transparent; }
@@ -398,6 +400,10 @@ body,
 .public-announcements .announcement-meta span.tone-info { background: #eef2ff; color: #4840c8; }
 .public-announcements .announcement-dates { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 13px; color: #728097; font: 450 10px/1.5 'DM Sans',sans-serif; }
 .public-announcements .public-update-cta { margin-top: 14px; }
+.public-announcements .public-update-cta { width: fit-content; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border: 1px solid #d49b00; border-radius: 12px; background: linear-gradient(135deg,#ffd84a,#f4b900); color: #17130a; font: 800 12px 'DM Sans',sans-serif; text-decoration: none; box-shadow: 0 5px 14px #c68a002b; }
+.public-announcements .public-update-cta:hover { background: #f1b900; color: #090806; }
+.public-announcements .public-update-cta svg { width: 15px; height: 15px; }
+.public-announcements .public-update-cta-label { cursor: default; }
 /* Customer storefront violet canvas keeps the white announcement cards distinct. */
 .customer-storefront,
 .customer-storefront .shop-header,
@@ -455,7 +461,7 @@ body,
 .agent-dashboard-active .agent-sidebar-logout { width: 100%; min-height: 40px; justify-content: flex-start; align-self: stretch; margin: 8px 0 0; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #ff4b52; font-size: 12px; }
 .agent-dashboard-active .agent-sidebar-logout:hover { background: #ffffff0c; }
 .agent-portal.agent-dashboard-active { background: #050505; }
-.agent-dashboard-active .agent-sidebar { background: #000; border-right-color: #252525; }
+.agent-dashboard-active .agent-sidebar { background: #203450; border-right-color: #ffffff18; }
 .dashboard-route-loading { min-height: min(70vh,680px); display: grid; place-items: center; color: #e0e9f8; font: 650 14px 'DM Sans',sans-serif; }
 @media(max-width:850px) {
  .agent-portal.agent-dashboard-active { grid-template-columns: minmax(0,1fr); }

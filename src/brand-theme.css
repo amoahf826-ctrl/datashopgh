@@ -1,0 +1,110 @@
+:root {
+  --brand-black: #090909;
+  --brand-ink: #171717;
+  --brand-gold: #f5bd19;
+  --brand-gold-deep: #d99b00;
+  --brand-gold-soft: #fff5cc;
+  --brand-white: #fff;
+  --brand-paper: #fbf9f2;
+  --brand-line: #e9dfbf;
+}
+
+body { color: var(--brand-ink); background: var(--brand-paper); }
+.app-shell { background: var(--brand-paper); }
+
+/* Give the brand mark enough room to read at a glance. */
+.brand-logo { width: 56px; height: 56px; border-color: #d6a500; border-radius: 13px; }
+.dashboard-brand-logo { width: 58px; height: 58px; border-color: #d6a500; border-radius: 14px; }
+.shop-brand-icon { width: 56px; height: 56px; }
+.customer-storefront .shop-brand-icon.customer-brand-image { width: 58px; height: 58px; }
+.shop-brand-icon.customer-brand-image img { width: 100%; height: 100%; object-fit: cover; }
+.admin-brand-mark { width: 60px; height: 60px; }
+.agent-brand-mark img,.agent-dashboard-active .agent-brand-mark img { width: 50px; height: 50px; }
+
+/* The static HTML splash appears before the customer storefront can render. */
+.brand-launch { position: fixed; z-index: 2147483000; inset: 0; display: grid; place-content: center; justify-items: center; gap: 17px; padding: 24px; overflow: hidden; background: radial-gradient(ellipse at center,#211b0b 0%,#0b0b0b 48%,#050505 100%); color: #f5bd19; }
+.brand-launch img { display: block; width: min(68vw,300px); height: min(68vw,300px); object-fit: contain; border: 1px solid #bd8b00; border-radius: 22px; background: #050505; box-shadow: 0 0 0 7px #f5bd1914,0 22px 80px #000b; animation: brand-launch-appear .55s ease-out both; }
+.brand-launch span { font: 750 13px Manrope,sans-serif; letter-spacing: .08em; color: #fff4c7; }
+.brand-launch i { width: 100px; height: 3px; overflow: hidden; border-radius: 4px; background: #ffffff24; }
+.brand-launch i::after { display: block; width: 45%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#d99b00,#ffe276); content: ''; animation: brand-launch-progress 1.1s ease-in-out infinite; }
+.brand-launch-overlay { animation: brand-launch-fade 1.5s ease-in forwards; }
+@keyframes brand-launch-appear { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes brand-launch-progress { from { transform: translateX(-110%); } to { transform: translateX(240%); } }
+@keyframes brand-launch-fade { 0%,84% { opacity: 1; visibility: visible; } 100% { opacity: 0; visibility: hidden; pointer-events: none; } }
+
+/* Shared public shell and calls to action */
+.header { background: var(--brand-white); border-color: var(--brand-line); }
+.brand { color: var(--brand-black); }
+.brand-gh { color: var(--brand-gold-deep); }
+.brand-mark { background: var(--brand-black); }
+.brand-mark span { background: var(--brand-gold); }
+.nav button.active { color: var(--brand-black); }
+.nav button.active:after { background: var(--brand-gold); }
+.signup-button,.primary { background: var(--brand-black); color: var(--brand-gold); }
+.signup-button:hover,.primary:hover { background: #29220d; color: #ffcf37; }
+.mobile-menu,.login-link:hover,.header-name:hover { color: var(--brand-gold-deep); }
+.hero h1,.inner-head h1 { color: var(--brand-black); }
+.hero h1 span { color: var(--brand-gold-deep); }
+.eyebrow { color: #9a7000; }
+.hero-art .art-dot,.testbar>span:first-child { background: var(--brand-gold); }
+.hero-art .progress-track span { background: linear-gradient(90deg,var(--brand-gold-deep),#ffdc62); }
+.hero-art .network-emblem { background: var(--brand-gold-soft); color: #725200; }
+.benefits { border-color: var(--brand-line); }
+
+/* Admin console: black navigation, warm white workspace, gold controls */
+.admin-layout,.admin-workspace { background: #f6f3e9; color: var(--brand-ink); }
+.admin-sidebar { background: var(--brand-black); color: #f7f3e7; }
+.admin-brand { border-color: #ffffff20; }
+.admin-brand-mark { background: linear-gradient(145deg,#ffd84b,var(--brand-gold-deep)) !important; }
+.admin-nav-label { color: #c8ad59; }
+.admin-sidebar nav button { color: #e7e2d5; }
+.admin-sidebar nav button:hover { background: #ffffff12; color: var(--brand-white); }
+.admin-sidebar nav button.active { background: var(--brand-gold); color: var(--brand-black); box-shadow: inset 3px 0 #fff0a2; }
+.admin-sidebar nav button.active svg { color: var(--brand-black); }
+.admin-sidebar>.admin-logout-link { color: #f1e9d5; }
+.admin-sidebar>.admin-logout-link:hover { background: #ffffff12; color: var(--brand-gold); }
+.admin-sidebar-bottom { border-color: #ffffff20; background: #181715; color: #e9e2cf; }
+.admin-sidebar-bottom b { color: var(--brand-white); }
+.admin-sidebar-bottom small { color: #c2b999; }
+.admin-topbar { background: #fffdf7; border-color: var(--brand-line); }
+.admin-heading h1,.admin-card h2,.api-providers-heading h2,.api-provider-credentials h2 { color: var(--brand-black); }
+.admin-content { color: var(--brand-ink); }
+.admin-card,.admin-metric,.api-providers-panel,.api-provider-credentials { border-color: #e8dfc7; }
+.admin-card-heading button,.ops-primary,.admin-update-form .primary,
+.api-provider-toolbar button.add,.api-provider-actions button.green,
+.api-active-provider-note button,.admin-layout button[class*="primary"],
+.admin-layout button[class*="submit"],.admin-layout button[class*="save"],
+.admin-layout .admin-wallet-apply,.admin-layout .admin-update-actions button:not(.delete):not(.toggle) { background: var(--brand-gold); color: var(--brand-black); }
+.admin-card-heading button:hover,.ops-primary:hover,.api-provider-toolbar button.add:hover,
+.api-provider-actions button.green:hover,.api-active-provider-note button:hover { background: #e8ad08; color: var(--brand-black); }
+.admin-sidebar .admin-brand b { color: var(--brand-white); }
+.admin-layout .admin-action { border-color: #e3d6ad; color: var(--brand-black); }
+.admin-layout .admin-action:hover { border-color: var(--brand-gold-deep); background: var(--brand-gold-soft); }
+.admin-layout .admin-heading .admin-back-button:hover { border-color: var(--brand-gold); }
+
+/* Keep the requested violet customer canvas and network bundle colors intact. */
+.customer-storefront { --brand-customer-violet: #241331; }
+.store-bundles .store-bundle,.network-category.mtn,.network-category.at,
+.network-category.telecel,.airtime-network-options button.mtn.active,
+.airtime-network-options button.at.active,.airtime-network-options button.telecel.active { color: inherit; }
+
+/* Agent workspace retains its dark identity; gold marks the brand actions and selection. */
+.agent-dashboard-active .agent-sidebar { background: var(--brand-black); }
+.agent-dashboard-active .agent-sidebar nav button.active { background: var(--brand-gold); color: var(--brand-black); }
+.agent-dashboard-active .agent-sidebar nav button.active svg { color: var(--brand-black); }
+.agent-dashboard-active .agent-sidebar-logout { color: #ffcf37; }
+.agent-dashboard-active .agent-back-button,.agent-dashboard-active .agent-refresh,
+.agent-dashboard-active .agent-sidebar nav button:not(.active):hover { border-color: #d8a600; }
+.agent-dashboard-active .agent-main-head h1,.agent-dashboard-active .agent-kicker { color: #f5bd19; }
+.agent-dashboard-active .agent-main .agent-primary,
+.agent-dashboard-active .agent-main .agent-action-primary { background: var(--brand-gold); color: var(--brand-black); }
+
+@media (max-width: 800px) {
+  .admin-sidebar { background: var(--brand-black); }
+  .brand-logo { width: 50px; height: 50px; }
+  .dashboard-brand-logo { width: 52px; height: 52px; }
+  .shop-brand-icon { width: 52px; height: 52px; }
+  .customer-storefront .shop-brand-icon.customer-brand-image { width: 54px; height: 54px; }
+  .admin-brand-mark { width: 56px; height: 56px; }
+  .agent-brand-mark img,.agent-dashboard-active .agent-brand-mark img { width: 46px; height: 46px; }
+}

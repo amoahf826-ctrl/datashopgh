@@ -27,7 +27,7 @@ export default function PublicAnnouncements({ updates, className = '' }: { updat
       <div className="announcement-copy"><b>{rebrand(update.title)}</b><p>{rebrand(update.message)}</p></div>
       {update.image_url && <img className="public-shop-update-image" src={update.image_url} alt={rebrand(update.title)} loading="lazy"/>}
       {update.video_url && <video className="public-shop-update-image" controls playsInline preload="metadata" src={update.video_url}>{rebrand(update.title)}</video>}
-      {update.button_text && update.button_link && <a className="public-update-cta" href={update.button_link} target={update.button_link.startsWith('http') ? '_blank' : undefined} rel={update.button_link.startsWith('http') ? 'noopener noreferrer' : undefined}>{update.button_text}<ArrowRight/></a>}
+      {update.button_text && (update.button_link ? <a className="public-update-cta" href={update.button_link} target={update.button_link.startsWith('http') ? '_blank' : undefined} rel={update.button_link.startsWith('http') ? 'noopener noreferrer' : undefined}>{update.button_text}<ArrowRight/></a> : <span className="public-update-cta public-update-cta-label">{update.button_text}</span>)}
     </article>)}
   </section>;
 }
