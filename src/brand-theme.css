@@ -234,6 +234,10 @@ body { background: linear-gradient(135deg,#fff9df 0%,#f7edd1 48%,#fff3d1 100%); 
 .app-shell .storefront.customer-storefront .shop-content .network-categories .network-category.info-folder { background:#050505 !important; background-image:none !important; border-color:#292929 !important; }
 .app-shell .storefront.customer-storefront .shop-content .network-categories .network-category .category-details h3,
 .app-shell .storefront.customer-storefront .shop-content .network-categories .network-category .category-details p { color:#fff !important; }
+.app-shell .storefront.customer-storefront .shop-content .afa-folder-page .shop-section-heading h2,
+.app-shell .storefront.customer-storefront .shop-content .afa-folder-page .shop-section-heading p,
+.app-shell .storefront.customer-storefront .shop-content .afa-folder-page .afa-request-title b,
+.app-shell .storefront.customer-storefront .shop-content .afa-folder-page .afa-request-title small { color:#fff !important; }
 .customer-storefront .network-category,
 .customer-storefront .network-category.bigtime-folder,
 .customer-storefront .network-category.afa-folder,
