@@ -97,6 +97,7 @@ Deno.serve(async (request: Request) => {
   await Promise.all(Array.from({ length: Math.min(4, numbers.length) }, () => verifyWorker()));
 
   const checkedAt = new Date().toISOString();
+  let saved = true;
   for (const result of results) {
     const { error } = await service.from("number_verification_submissions").update({
       verification_status: result.status ?? "unchecked",
@@ -108,9 +109,12 @@ Deno.serve(async (request: Request) => {
       hubnet_status: result.status ?? null, hubnet_error: result.error ?? null,
       hubnet_request_id: result.request_id ?? null, hubnet_checked_at: checkedAt,
     }).eq("agent_id", authData.user.id).eq("phone_number", result.number);
-    if (error) result.error = "Hubnet responded, but the result could not be saved. Apply the latest number verification migration, then retry.";
+    if (error) {
+      saved = false;
+      result.error = "Hubnet responded, but the result could not be saved. Apply the latest number verification migration, then retry.";
+    }
   }
-  return json(200, { success: results.every((result) => !!result.status),
+  return json(200, { success: saved && results.every((result) => !!result.status),
     results: results.map((result) => ({ number: result.number, status: result.status ?? null })),
     checked_at: checkedAt });
 });
