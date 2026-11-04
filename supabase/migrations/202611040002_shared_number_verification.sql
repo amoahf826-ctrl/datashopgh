@@ -41,11 +41,11 @@ begin
   end if;
   foreach v_phone in array p_phone_numbers loop
     if v_phone !~ '^0[0-9]{9}$' then raise exception 'Enter valid 10-digit Ghana phone numbers'; end if;
-    if exists(select 1 from public.number_verification_submissions where user_id=auth.uid() and phone_number=v_phone) then
-      update public.number_verification_submissions
+    if exists(select 1 from public.number_verification_submissions nvs where nvs.user_id=auth.uid() and nvs.phone_number=v_phone) then
+      update public.number_verification_submissions as nvs
         set verification_status='unchecked',hubnet_status=null,hubnet_error=null,hubnet_checked_at=null,
             datahub_status=null,datahub_submitted_at=null,created_at=now(),updated_at=now()
-        where user_id=auth.uid() and phone_number=v_phone
+        where nvs.user_id=auth.uid() and nvs.phone_number=v_phone
         returning * into v_row;
     else
       insert into public.number_verification_submissions(user_id,phone_number)
