@@ -43,10 +43,6 @@ Deno.serve(async (request: Request) => {
   const { data: authData, error: authError } = await auth.auth.getUser();
   if (authError || !authData.user) return json(401, { error: "Your session is invalid or expired." });
   const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: agent, error: agentError } = await service.from("agent_accounts")
-    .select("is_active").eq("user_id", authData.user.id).maybeSingle();
-  if (agentError) return json(503, { error: "Could not verify agent access." });
-  if (!agent?.is_active) return json(403, { error: "An active agent account is required." });
   if (!hubnetToken || !hubnetBase) return json(503, { error: "Hubnet server secrets are not configured." });
 
   let base: URL;
@@ -62,11 +58,11 @@ Deno.serve(async (request: Request) => {
     return json(400, { error: "Submit 1 to 30 valid 10-digit Ghanaian MTN numbers per check." });
   }
   const numbers = [...new Set(body.numbers as string[])];
-  const { data: submissions, error: submissionsError } = await service.from("agent_number_submissions")
-    .select("phone_number").eq("agent_id", authData.user.id).in("phone_number", numbers);
+  const { data: submissions, error: submissionsError } = await service.from("number_verification_submissions")
+    .select("phone_number").eq("user_id", authData.user.id).in("phone_number", numbers);
   if (submissionsError) return json(503, { error: "Could not verify these submitted numbers." });
   const ownedNumbers = new Set((submissions ?? []).map((row) => row.phone_number));
-  if (numbers.some((number) => !ownedNumbers.has(number))) return json(403, { error: "Submit these numbers through your agent account before checking them." });
+  if (numbers.some((number) => !ownedNumbers.has(number))) return json(403, { error: "Submit these numbers through your account before checking them." });
 
   const tokenHeader = /^Bearer\s+/i.test(hubnetToken) ? hubnetToken : `Bearer ${hubnetToken}`;
   const results: Result[] = new Array(numbers.length);
@@ -102,12 +98,19 @@ Deno.serve(async (request: Request) => {
 
   const checkedAt = new Date().toISOString();
   for (const result of results) {
-    const { error } = await service.from("agent_number_submissions").update({
+    const { error } = await service.from("number_verification_submissions").update({
+      verification_status: result.status ?? "unchecked",
+      hubnet_status: result.status ?? null, hubnet_error: result.error ?? null,
+      hubnet_checked_at: checkedAt, updated_at: checkedAt,
+    }).eq("user_id", authData.user.id).eq("phone_number", result.number);
+    // Keep existing agent review tooling in sync when an agent submission exists.
+    await service.from("agent_number_submissions").update({
       hubnet_status: result.status ?? null, hubnet_error: result.error ?? null,
       hubnet_request_id: result.request_id ?? null, hubnet_checked_at: checkedAt,
     }).eq("agent_id", authData.user.id).eq("phone_number", result.number);
     if (error) result.error = "Hubnet responded, but the result could not be saved. Apply the latest number verification migration, then retry.";
   }
-  return json(200, { success: results.every((result) => !!result.status), results, checked_at: checkedAt,
-    message: "MTN eTopup beneficiary check complete. Queued numbers may be checked again after two minutes." });
+  return json(200, { success: results.every((result) => !!result.status),
+    results: results.map((result) => ({ number: result.number, status: result.status ?? null })),
+    checked_at: checkedAt });
 });
