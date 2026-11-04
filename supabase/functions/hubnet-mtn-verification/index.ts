@@ -18,7 +18,7 @@ function readKey(legacyName: string, collectionName: string): string | undefined
     return typeof first === "string" ? first : undefined;
   } catch { return undefined; }
 }
-type Result = { number: string; status?: "verified"|"unverified"|"queued"|"invalid"; request_id?: string|null; error?: string };
+type Result = { number: string; status?: "verified"|"unverified"|"queued"|"invalid"; request_id?: string|null; error?: string; http_status?: number };
 function normalizedNumber(value: unknown): string {
   const digits = String(value ?? "").replace(/\D/g, "");
   if (digits.startsWith("233") && digits.length === 12) return `0${digits.slice(3)}`;
@@ -84,13 +84,14 @@ Deno.serve(async (request: Request) => {
         const status = String(data?.status ?? "").toLowerCase();
         if (!response.ok || !(envelope?.status === true || envelope?.status === "success" || payload?.status === true || payload?.status === "success") || !["verified","unverified","queued","invalid"].includes(status) ||
             (data?.number != null && normalizedNumber(data.number) !== number)) {
-          results[index] = { number, error: envelope?.message ?? payload?.message ?? `Hubnet returned HTTP ${response.status}.` };
+          const providerMessage = envelope?.message ?? envelope?.error ?? payload?.message ?? payload?.error;
+          results[index] = { number, error: typeof providerMessage === "string" ? providerMessage.slice(0, 240) : `Hubnet returned HTTP ${response.status} without a recognized verification status.`, http_status: response.status };
         } else {
           const requestId = envelope?.request_id ?? payload?.request_id;
           results[index] = { number, status: status as Result["status"], request_id: typeof requestId === "string" ? requestId : null };
         }
-      } catch {
-        results[index] = { number, error: "Hubnet did not respond. Retry this number." };
+      } catch (error) {
+        results[index] = { number, error: error instanceof Error && error.name === "TimeoutError" ? "Hubnet request timed out. Retry this number." : "Could not reach Hubnet. Check the function logs and retry.", http_status: 0 };
       }
     }
   }
@@ -115,6 +116,7 @@ Deno.serve(async (request: Request) => {
     }
   }));
   return json(200, { success: saved && results.every((result) => !!result.status),
-    results: results.map((result) => ({ number: result.number, status: result.status ?? null })),
+    results: results.map((result) => ({ number: result.number, status: result.status ?? null, error: result.error ?? null, http_status: result.http_status ?? null })),
+    message: `Hubnet checked ${results.filter((result) => !!result.status).length} of ${numbers.length} number(s).`,
     checked_at: checkedAt });
 });

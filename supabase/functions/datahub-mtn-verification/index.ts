@@ -19,7 +19,7 @@ function readKey(legacyName: string, collectionName: string): string | undefined
   } catch { return undefined; }
 }
 type VerificationStatus = "verified" | "unverified" | "invalid";
-type Result = { number: string; status?: VerificationStatus; error?: string };
+type Result = { number: string; status?: VerificationStatus; error?: string; http_status?: number };
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -76,10 +76,11 @@ Deno.serve(async (request: Request) => {
         } else if (response.status === 400 && payload?.success === false) {
           results[index] = { number, status: "invalid" };
         } else {
-          results[index] = { number, error: "DataHub could not complete this check." };
+          const providerMessage = payload?.message ?? payload?.error;
+          results[index] = { number, error: typeof providerMessage === "string" ? providerMessage.slice(0, 240) : `DataHub returned HTTP ${response.status} without a recognized verification status.`, http_status: response.status };
         }
-      } catch {
-        results[index] = { number, error: "DataHub did not respond. Retry this number." };
+      } catch (error) {
+        results[index] = { number, error: error instanceof Error && error.name === "TimeoutError" ? "DataHub request timed out. Retry this number." : "Could not reach DataHub. Check the function logs and retry.", http_status: 0 };
       }
     }
   }
@@ -98,7 +99,8 @@ Deno.serve(async (request: Request) => {
   const success = results.every((result) => !!result.status) && persistence.every(Boolean);
   return json(200, {
     success,
-    results: results.map((result) => ({ number: result.number, status: result.status ?? null })),
+    results: results.map((result) => ({ number: result.number, status: result.status ?? null, error: result.error ?? null, http_status: result.http_status ?? null })),
+    message: `DataHub checked ${results.filter((result) => !!result.status).length} of ${numbers.length} number(s).`,
     checked_at: checkedAt,
   });
 });
