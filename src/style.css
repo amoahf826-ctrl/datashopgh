@@ -522,6 +522,7 @@
 .number-verification-row .is-checking{color:#8a6400}
 .number-verification-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:none;margin-left:auto;padding:11px 15px;border:0;border-radius:12px;background:linear-gradient(110deg,#6524cf,#ef6b23);color:#fff;font:700 13px inherit;cursor:pointer}
 .number-verification-toggle:hover{filter:brightness(1.05)}
+.number-verification-signin{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-radius:14px;background:#f8f5fc;color:#59647a}.number-verification-signin p{margin:0;font-size:14px}.number-verification-signin button{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;border:0;border-radius:11px;padding:11px 14px;background:linear-gradient(110deg,#6524cf,#ef6b23);color:#fff;font-weight:700;cursor:pointer}@media(max-width:560px){.number-verification-signin{align-items:stretch;flex-direction:column}.number-verification-signin button{justify-content:center}}
 .number-verification-row-error{flex-basis:100%;margin-left:0;color:#a6342b;font-size:12px;line-height:1.4;overflow-wrap:anywhere}
 @media(max-width:560px){.customer-number-verification .number-verification-heading{flex-wrap:wrap}.customer-number-verification .number-verification-toggle{margin-left:54px}}
 .network-page-title .all-bundles-logo{width:62px;height:62px;flex:none;object-fit:contain;border-radius:15px}
