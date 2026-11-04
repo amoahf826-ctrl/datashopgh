@@ -61,6 +61,29 @@ The admin console reads the role from the protected profile row, and every catal
 
 The admin API Providers page can select the active bundle provider. New paid storefront orders, agent wallet purchases, and agent MTN Submit Numbers use that provider; existing orders and both providers' saved number results remain in the database. The provider setting is stored in `platform_settings.active_bundle_provider`. Hubnet business purchases require `HUBNET_BEARER_TOKEN` and optionally `HUBNET_API_BASE_URL` (defaults to `https://console.hubnet.app`); Hubnet's wallet is debited when a purchase is submitted. Hubnet routes are MTN, AirtelTigo, Telecel, and Big Time; bundle volume is sent in MB. Hubnet MTN beneficiary checks use `hubnet-mtn-verification`; DataHub approval submissions use `datahub-beneficiary-submit` and the `DATAHUB_API_KEY` secret. Apply `202611020001_agent_datahub_beneficiaries.sql` before deploying the new DataHub beneficiary function and provider switch. DataHub accepts up to 30 MTN numbers per request and confirms submission for approval, not final approval. DataHub orders use `POST /api/external/data-purchase`; its `datahub-webhook` reconciles `order.status_updated` events using a separate secret URL token because DataHub's guide documents no signed webhook header. Keep provider and payment credentials in Supabase function secrets, never in browser variables or source control.
 
+
+## Android and iOS store apps
+
+Capacitor Android and iOS projects are included. The app display name is **CheapDataBundle**, and both projects use the existing application ID `com.wittytechnologies.datashopgh` to keep future updates tied to the same store listing. Native launcher icons use the CheapDataBundle logo.
+
+Prepare/sync the web build into either native project from Windows PowerShell:
+
+```powershell
+npm run mobile:android:sync
+npm run mobile:android:open
+```
+
+For iPhone, use a Mac with Xcode installed:
+
+```sh
+npm run mobile:ios:sync
+npm run mobile:ios:open
+```
+
+For Google Play, open the Android project in Android Studio, configure a release signing key under **Build > Generate Signed Bundle / APK**, choose **Android App Bundle**, then upload the signed `.aab` to Play Console. Do not commit the signing key or passwords. For Apple, configure the Apple Developer team and signing in Xcode, choose **Product > Archive**, then upload the archive through Organizer to App Store Connect. Complete each store's privacy, support, screenshots, age-rating, and business/payment disclosures before review.
+
+Store publishing cannot be completed from this Windows workspace: Apple archives require macOS/Xcode, and both stores require your developer accounts, signing credentials, listing information, and your final submission. The native projects are prepared locally; no app has been submitted or published.
+
 ## Build and publish
 
 Run `npm run build` to produce `dist/`. Publish the repository to your hosting provider (for example Vercel or Netlify), set the two public Supabase environment variables in its project settings, and deploy. Configure the matching production URL in Supabase Auth. Keep live bundle checkout disabled until the secrets, functions, Paystack webhook, and approved non-demo catalogue are configured.

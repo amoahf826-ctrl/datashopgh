@@ -10,7 +10,11 @@
     "confirm-account": "node scripts/confirm-account.mjs",
     "mobile:sync": "npm run build && node scripts/capacitor.mjs sync",
     "mobile:android": "node scripts/capacitor.mjs open android",
-    "mobile:ios": "node scripts/capacitor.mjs open ios"
+    "mobile:ios": "node scripts/capacitor.mjs open ios",
+    "mobile:android:sync": "npm run build && node scripts/capacitor.mjs sync android",
+    "mobile:ios:sync": "npm run build && node scripts/capacitor.mjs sync ios",
+    "mobile:android:open": "node scripts/capacitor.mjs open android",
+    "mobile:ios:open": "node scripts/capacitor.mjs open ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
