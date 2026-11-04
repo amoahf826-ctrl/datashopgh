@@ -220,6 +220,8 @@ body { background: linear-gradient(135deg,#fff9df 0%,#f7edd1 48%,#fff3d1 100%); 
 .customer-storefront .track-prompt { background:linear-gradient(112deg,#5617b4,#762bd7 55%,#4f11ae); border-color:#e4caff; color:#fff; box-shadow:0 9px 22px #42128c55; }
 .customer-storefront .track-prompt b,.customer-storefront .track-prompt small,.customer-storefront .track-chevron { color:#fff; }
 .customer-storefront .track-clock { border-color:#e7d1ff; color:#fff; }
+.pwa-install-button { position:fixed; right:22px; bottom:92px; z-index:1000; display:inline-flex; align-items:center; gap:9px; padding:13px 18px; border:1px solid #ffe276; border-radius:999px; background:linear-gradient(110deg,#d99b00,#f5bd19 55%,#ffe276); color:#100d04; font:700 14px/1 inherit; box-shadow:0 8px 24px #0006; cursor:pointer; }
+@media(max-width:640px){.pwa-install-button{right:16px;bottom:86px;padding:12px 15px;font-size:13px}}
 .customer-storefront .network-category,
 .customer-storefront .network-category.bigtime-folder,
 .customer-storefront .network-category.afa-folder,
