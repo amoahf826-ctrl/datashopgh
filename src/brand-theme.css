@@ -273,3 +273,14 @@ body { background: linear-gradient(135deg,#fff9df 0%,#f7edd1 48%,#fff3d1 100%); 
 .customer-storefront .track-prompt { background:linear-gradient(112deg,#5617b4,#762bd7 55%,#4f11ae); border-color:#e4caff; color:#fff; box-shadow:0 9px 22px #42128c55; }
 .customer-storefront .track-prompt b,.customer-storefront .track-prompt small,.customer-storefront .track-chevron { color:#fff; }
 .customer-storefront .track-clock { border-color:#e7d1ff; color:#fff; }
+
+/* Keep back cards readable after the dashboard theme overrides. */
+.agent-dashboard-active .agent-back-button,
+.admin-layout .admin-back-button,
+.storefront .network-page-back,
+.track-page .track-header > button,
+.agent-buy-title > button {
+  color: #080808 !important;
+  border: 1px solid #8b6500 !important;
+  background: #fff !important;
+}
