@@ -100,7 +100,14 @@ Deno.serve(async (request: Request) => {
     .select("delivery_reference,delivery_status,provider_transaction_id,payment_status,payment_reference,recipient_phone")
     .eq("provider_transaction_id", data.reference).maybeSingle();
   if (error) return reply(500, { error: "Could not find the matching order." });
-  if (!order) return reply(503, { error: "Order reference is not linked yet; retry this webhook." });
+  if (!order) {
+    // DataHub's documented /webhook/test sends this fixed mock order. It is
+    // authenticated by HMAC above, but it will never exist in our orders table.
+    const isDocumentedTestOrder = data.reference === "ORDER_123_1234567890" &&
+      Number(data.orderNumber) === 290293 && data.phoneNumber === "0538122730";
+    if (isDocumentedTestOrder) return reply(200, { received: true, test: true });
+    return reply(503, { error: "Order reference is not linked yet; retry this webhook." });
+  }
 
   if (["delivered", "failed"].includes(order.delivery_status)) {
     return reply(200, { received: true, duplicate: true });
