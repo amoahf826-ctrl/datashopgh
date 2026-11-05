@@ -65,12 +65,6 @@ Deno.serve(async (request: Request) => {
     return reply(401, { error: "Webhook authentication failed. Check the URL token or HMAC Secret Key." });
   }
 
-  // DataHub's configured webhook sender and its API guide currently use different User-Agent values.
-  const userAgent = request.headers.get("User-Agent") ?? "";
-  if (userAgent !== "DatahubGHMainServer-Webhook/1.0" && userAgent !== "DataHub-Webhook/1.0") {
-    return reply(401, { error: "Unexpected DataHub webhook User-Agent." });
-  }
-
   const eventType = String(event?.event ?? request.headers.get("X-Webhook-Event") ?? "").trim();
   if (["test", "webhook.test", "ping"].includes(eventType.toLowerCase()) || event?.test === true) {
     return reply(200, { received: true, test: true });
@@ -87,13 +81,12 @@ Deno.serve(async (request: Request) => {
     return reply(400, { error: "Invalid DataHub order status event." });
   }
 
-  const timestampHeader = request.headers.get("X-Webhook-Timestamp");
-  const timestamp = Date.parse(String(event.timestamp ?? ""));
-  if (!timestampHeader || timestampHeader !== event.timestamp || !Number.isFinite(timestamp) || Math.abs(Date.now() - timestamp) > 10 * 60 * 1000) {
-    return reply(401, { error: "Webhook timestamp is missing, mismatched, or expired." });
-  }
-  if (!supportedOrderEvents.includes(request.headers.get("X-Webhook-Event") ?? "")) {
-    return reply(401, { error: "Unexpected DataHub webhook headers." });
+  // DataHub's guide guarantees the event and timestamp in the JSON payload,
+  // and the HMAC in X-Webhook-Signature. It does not require separate event or
+  // timestamp headers, so don't reject otherwise valid deliveries for lacking them.
+  const payloadTimestamp = Date.parse(String(event.timestamp ?? ""));
+  if (Number.isFinite(payloadTimestamp) && Math.abs(Date.now() - payloadTimestamp) > 10 * 60 * 1000) {
+    return reply(401, { error: "Webhook timestamp is expired." });
   }
 
   const status = String(data.status).trim().toUpperCase().replace(/[\s-]+/g, "_");
