@@ -65,8 +65,8 @@ Deno.serve(async (request: Request) => {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-API-Key": datahubKey, Accept: "application/json" },
           body: JSON.stringify({ phone: number, is_ported_number: true }),
-          // Keep the live status response quick for storefront and agent flows.
-          signal: AbortSignal.timeout(2000),
+          // Allow DataHub enough time to return its live beneficiary status.
+          signal: AbortSignal.timeout(30000),
         });
         const payload = await response.json().catch(() => null);
         const providerMessage = String(payload?.error ?? payload?.message ?? "");

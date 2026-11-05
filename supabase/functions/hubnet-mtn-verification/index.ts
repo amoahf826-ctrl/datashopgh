@@ -76,7 +76,7 @@ Deno.serve(async (request: Request) => {
       try {
         const response = await fetch(endpoint, {
           method: "GET", headers: { token: tokenHeader, Accept: "application/json" },
-          signal: AbortSignal.timeout(2000),
+          signal: AbortSignal.timeout(12000),
         });
         const payload = await response.json().catch(() => null);
         const envelope = payload?.response ?? payload;
