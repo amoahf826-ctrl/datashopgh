@@ -61,23 +61,26 @@ Deno.serve(async (request: Request) => {
       const index = next++;
       const number = numbers[index];
       try {
-        const response = await fetch("https://user.datahubgh.com/api/external/verify", {
+        const response = await fetch("https://user.datahubgh.com/api/external/purchases/verify-number", {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-API-Key": datahubKey, Accept: "application/json" },
-          body: JSON.stringify({ networkKey, recipient: number, is_ported_number: true }),
+          body: JSON.stringify({ phone: number, is_ported_number: true }),
           signal: AbortSignal.timeout(10000),
         });
         const payload = await response.json().catch(() => null);
-        if (payload?.success === true && payload?.data?.exists === true) {
+        const providerMessage = String(payload?.error ?? payload?.message ?? "");
+        const explicitlyVerified = payload?.success === true &&
+          (payload?.data?.verified === true || payload?.data?.exists === true);
+        const explicitlyUnverified = payload?.data?.verified === false || payload?.data?.exists === false ||
+          /phone number not verified|not added to.*beneficiar/i.test(providerMessage);
+        if (response.ok && explicitlyVerified) {
           results[index] = { number, status: "verified" };
-        } else if ((payload?.success === false || payload?.success === true) &&
-          (payload?.data?.exists === false || /not verified|not added to.*beneficiar/i.test(String(payload?.error ?? payload?.message ?? "")))) {
+        } else if ((response.ok || response.status === 400) && explicitlyUnverified) {
           results[index] = { number, status: "unverified" };
         } else if (response.status === 400 && payload?.success === false) {
           results[index] = { number, status: "invalid" };
         } else {
-          const providerMessage = payload?.message ?? payload?.error;
-          results[index] = { number, error: typeof providerMessage === "string" ? providerMessage.slice(0, 240) : `DataHub returned HTTP ${response.status} without a recognized verification status.`, http_status: response.status };
+          results[index] = { number, error: providerMessage ? providerMessage.slice(0, 240) : `DataHub returned HTTP ${response.status} without a recognized verification status.`, http_status: response.status };
         }
       } catch (error) {
         results[index] = { number, error: error instanceof Error && error.name === "TimeoutError" ? "DataHub request timed out. Retry this number." : "Could not reach DataHub. Check the function logs and retry.", http_status: 0 };
