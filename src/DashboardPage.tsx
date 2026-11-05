@@ -2,10 +2,11 @@ import { useState } from 'react';
 import PublicAnnouncements, { type PublicAnnouncement } from './PublicAnnouncements';
 import cheapDataBundleLogo from './assets/cheapdatabundle-logo.png';
 import NumberVerificationPanel from './NumberVerificationPanel';
+import OrderComplaintAction from './OrderComplaintAction';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ArrowRight, ArrowUpRight, ChevronRight, CircleHelp, Clock3, CreditCard, Menu, PackageCheck, Plus, Smartphone, Wallet, X } from 'lucide-react';
 
-type Order={id:string;network:'MTN'|'Telecel'|'AT';bundle:string;phone:string;price:number;status:'Pending'|'Processing'|'Successful'|'Failed';date:string};
+type Order={id:string;network:'MTN'|'Telecel'|'AT';bundle:string;phone:string;price:number;status:'Pending'|'Processing'|'Successful'|'Failed';date:string;createdAt:string;deliveryStatus?:string};
 const format=(n:number)=>new Intl.NumberFormat('en-GH',{style:'currency',currency:'GHS',minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
 
 export default function DashboardPage({name,email,balance,orders,updates,onNavigate,onTopUp,onNotice,client,userId}:{name:string;email:string;balance:number;orders:Order[];updates:PublicAnnouncement[];onNavigate:(page:'home'|'buy'|'orders'|'wallet'|'profile')=>void;onTopUp:()=>void;onNotice:(message:string)=>void;client:SupabaseClient|null;userId:string}){
@@ -19,7 +20,7 @@ export default function DashboardPage({name,email,balance,orders,updates,onNavig
   <NumberVerificationPanel client={client} userId={userId}/>
   <PublicAnnouncements updates={updates} className="dashboard-announcements"/>
   <section className="dashboard-stats" aria-label="Account summary"><article><span className="stat-label">TOTAL ORDERS</span><b>{orders.length}</b><small>{orders.length===1?'Order':'Orders'} placed</small></article><article><span className="stat-label">PENDING</span><b>{pending.length}</b><small>Awaiting processing</small></article><article><span className="stat-label">SUCCESSFUL</span><b>{successful.length}</b><small>Completed orders</small></article><article><span className="stat-label">SPENT</span><b>{format(spent)}</b><small>Successful orders</small></article></section>
-  <section className="dashboard-recent"><div className="dashboard-recent-head"><div><h2>Recent orders</h2><p>Your latest bundle activity</p></div><button onClick={()=>nav('orders')}>View history <ArrowRight/></button></div>{orders.length?orders.slice(0,3).map(o=><div className="dashboard-order" key={o.id}><span className={`dashboard-network ${o.network.toLowerCase()}`}>{o.network==='Telecel'?'T':o.network[0]}</span><div><b>{o.bundle} · {o.network}</b><small>{o.phone} · {o.date}</small></div><span className={`dashboard-status ${o.status.toLowerCase()}`}>{o.status}</span><strong>{format(o.price)}</strong></div>):<div className="dashboard-no-orders"><span><PackageCheck/></span><b>No orders yet</b><small>Your bundle orders will appear here.</small><button onClick={()=>nav('buy')}>Browse bundles <ArrowRight/></button></div>}</section>
+  <section className="dashboard-recent"><div className="dashboard-recent-head"><div><h2>Recent orders</h2><p>Your latest bundle activity</p></div><button onClick={()=>nav('orders')}>View history <ArrowRight/></button></div>{orders.length?orders.slice(0,3).map(o=><div className="dashboard-order" key={o.id}><span className={`dashboard-network ${o.network.toLowerCase()}`}>{o.network==='Telecel'?'T':o.network[0]}</span><div><b>{o.bundle} · {o.network}</b><small>{o.phone} · {o.date}</small></div><span className={`dashboard-status ${o.status.toLowerCase()}`}>{o.status}</span><strong>{format(o.price)}</strong><OrderComplaintAction client={client} userId={userId} orderId={o.id} delivered={o.deliveryStatus==='delivered'} order={{phone:o.phone,bundle:o.bundle,network:o.network,createdAt:o.createdAt}}/></div>):<div className="dashboard-no-orders"><span><PackageCheck/></span><b>No orders yet</b><small>Your bundle orders will appear here.</small><button onClick={()=>nav('buy')}>Browse bundles <ArrowRight/></button></div>}</section>
   <footer className="dashboard-footer">© 2026 CheapDataBundle <span>•</span> Powered by <strong>Witty Multimedia</strong></footer>
  </div></div>
 }
