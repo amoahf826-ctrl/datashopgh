@@ -527,3 +527,16 @@
 @media(max-width:560px){.customer-number-verification .number-verification-heading{flex-wrap:wrap}.customer-number-verification .number-verification-toggle{margin-left:54px}}
 .network-page-title .all-bundles-logo{width:62px;height:62px;flex:none;object-fit:contain;border-radius:15px}
 .admin-order-retry-note{margin:10px 0;padding:12px 15px;border-radius:14px;background:#fff5df;color:#775512;font-size:12px}.admin-order-switch-provider{border:0;border-radius:11px;background:#1769e8;color:white;padding:10px 12px;font:700 12px 'DM Sans';white-space:nowrap;cursor:pointer}.admin-order-switch-provider:disabled{opacity:.55;cursor:wait}
+
+/* Login and sign-up copy and controls use a readable 14px size. */
+.auth-modal .eyebrow,
+.auth-modal .modal-desc,
+.auth-modal .field-label,
+.auth-modal .form-input,
+.auth-modal .field-hint,
+.auth-modal .modal-primary,
+.auth-modal .forgot-password,
+.auth-modal .switch-auth,
+.auth-modal .switch-auth button,
+.auth-modal .inline-error { font-size:14px; }
+.auth-modal .form-input { height:46px; }
