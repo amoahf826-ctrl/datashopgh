@@ -19,7 +19,7 @@ function readKey(legacyName: string, collectionName: string): string | undefined
   } catch { return undefined; }
 }
 type VerificationStatus = "verified" | "unverified" | "invalid";
-type Result = { number: string; status?: VerificationStatus; error?: string; http_status?: number };
+type Result = { number: string; status?: VerificationStatus; status_label?: string; error?: string; http_status?: number };
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -76,9 +76,11 @@ Deno.serve(async (request: Request) => {
         const explicitlyUnverified = payload?.data?.verified === false || payload?.data?.exists === false ||
           /phone number not verified|not added to.*beneficiar/i.test(providerMessage);
         if (response.ok && explicitlyVerified) {
-          results[index] = { number, status: "verified" };
+          const statusLabel = String(payload?.data?.message ?? "").trim();
+          results[index] = { number, status: "verified", ...(statusLabel ? { status_label: statusLabel.slice(0, 120) } : {}) };
         } else if ((response.ok || response.status === 400) && explicitlyUnverified) {
-          results[index] = { number, status: "unverified" };
+          const statusLabel = String(payload?.error ?? "").trim();
+          results[index] = { number, status: "unverified", ...(statusLabel ? { status_label: statusLabel.slice(0, 120) } : {}) };
         } else if (response.status === 400 && payload?.success === false) {
           results[index] = { number, status: "invalid" };
         } else {
@@ -107,7 +109,7 @@ Deno.serve(async (request: Request) => {
   const success = results.every((result) => !!result.status) && persistence.every(Boolean);
   return json(200, {
     success,
-    results: results.map((result) => ({ number: result.number, status: result.status ?? null, error: result.error ?? null, http_status: result.http_status ?? null })),
+    results: results.map((result) => ({ number: result.number, status: result.status ?? null, status_label: result.status_label ?? null, error: result.error ?? null, http_status: result.http_status ?? null })),
     message: `DataHub checked ${results.filter((result) => !!result.status).length} of ${numbers.length} number(s).`,
     checked_at: checkedAt,
   });
