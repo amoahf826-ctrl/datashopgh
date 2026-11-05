@@ -65,7 +65,9 @@ Deno.serve(async (request: Request) => {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-API-Key": datahubKey, Accept: "application/json" },
           body: JSON.stringify({ phone: number, is_ported_number: true }),
-          signal: AbortSignal.timeout(10000),
+          // DataHub's live verification endpoint may take longer while it
+          // checks or queues a number; allow it up to 30 seconds to respond.
+          signal: AbortSignal.timeout(30000),
         });
         const payload = await response.json().catch(() => null);
         const providerMessage = String(payload?.error ?? payload?.message ?? "");
@@ -83,7 +85,10 @@ Deno.serve(async (request: Request) => {
           results[index] = { number, error: providerMessage ? providerMessage.slice(0, 240) : `DataHub returned HTTP ${response.status} without a recognized verification status.`, http_status: response.status };
         }
       } catch (error) {
-        results[index] = { number, error: error instanceof Error && error.name === "TimeoutError" ? "DataHub request timed out. Retry this number." : "Could not reach DataHub. Check the function logs and retry.", http_status: 0 };
+        const timedOut = error instanceof Error && error.name === "TimeoutError";
+        if (timedOut) console.warn("DataHub number verification timed out.");
+        else console.error("DataHub number verification request failed.", error instanceof Error ? error.message : "Unknown request error");
+        results[index] = { number, error: timedOut ? "DataHub verification timed out after 30 seconds. Retry this number." : "Could not reach DataHub. Check the function logs and retry.", http_status: 0 };
       }
     }
   }
