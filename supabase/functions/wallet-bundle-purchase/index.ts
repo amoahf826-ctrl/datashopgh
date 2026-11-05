@@ -147,8 +147,9 @@ Deno.serve(async (request: Request) => {
         await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "failed",
           p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference });
         const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
+        const providerReason = String(resultData.message ?? result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
         return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
-          message: refundError ? "The active provider reported a failed order. Contact support to reconcile the wallet." : "The active provider reported a failed order; your wallet was refunded." });
+          message: refundError ? "The provider reported a failed delivery. Contact support to reconcile your wallet." : `The ${activeProvider === "hubnet" ? "Hubnet" : "DataHub GH"} provider reported a failed delivery${providerReason ? `: ${providerReason}` : ""}. Your wallet has been refunded.` });
       }
       const deliveryStatus = providerStatus ?? "unknown";
       await service.rpc("update_live_order_delivery", {
@@ -170,7 +171,7 @@ Deno.serve(async (request: Request) => {
       });
       return json(200, { success: true, ...order, delivery_status: "failed",
         wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
-        message: refundError ? "Delivery failed. Contact support to reconcile your wallet." : "Delivery failed; your wallet was refunded." });
+        message: refundError ? "The provider rejected delivery. Contact support to reconcile your wallet." : `${activeProvider === "hubnet" ? "Hubnet" : "DataHub GH"} rejected the delivery request${String(result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim() ? `: ${String(result?.message ?? result?.error).replace(/[<>\r\n]+/g, " ").trim().slice(0, 180)}` : ""}. Your wallet has been refunded.` });
     }
 
     await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "unknown" });
