@@ -552,3 +552,5 @@
   border-color: #8b6500 !important;
   background-color: #fff !important;
 }
+.ops-sms-form input[type="datetime-local"]{width:100%;min-height:45px;border:1px solid #dfe4ea;border-radius:13px;background:#fff;padding:10px 13px;color:#172033;font:500 13px 'DM Sans',sans-serif}
+.ops-sms-schedule-note{color:#778294;font-size:11px;line-height:1.5}
