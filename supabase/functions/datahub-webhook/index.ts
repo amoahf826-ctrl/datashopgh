@@ -103,8 +103,8 @@ Deno.serve(async (request: Request) => {
   if (!order) {
     // DataHub's documented /webhook/test sends this fixed mock order. It is
     // authenticated by HMAC above, but it will never exist in our orders table.
-    const isDocumentedTestOrder = data.reference === "ORDER_123_1234567890" &&
-      Number(data.orderNumber) === 290293 && data.phoneNumber === "0538122730";
+    const isDocumentedTestOrder = data.reference === "ORDER_123_1234567890" ||
+      Number(data.orderNumber) === 290293;
     if (isDocumentedTestOrder) return reply(200, { received: true, test: true });
     return reply(503, { error: "Order reference is not linked yet; retry this webhook." });
   }
