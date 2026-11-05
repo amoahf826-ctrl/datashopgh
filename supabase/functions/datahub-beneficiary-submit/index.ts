@@ -43,6 +43,7 @@ Deno.serve(async (request: Request) => {
   const auth = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const { data: authData, error: authError } = await auth.auth.getUser();
   if (authError || !authData.user) return json(401, { error: "Your session is invalid or expired." });
+  const userId = authData.user.id;
   const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   let body: { numbers?: unknown };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }
@@ -52,7 +53,7 @@ Deno.serve(async (request: Request) => {
   }
   const numbers = [...new Set(body.numbers as string[])];
   const { data: submissions, error: submissionsError } = await service.from("number_verification_submissions")
-    .select("phone_number").eq("user_id", authData.user.id).in("phone_number", numbers);
+    .select("phone_number").eq("user_id", userId).in("phone_number", numbers);
   if (submissionsError) return json(503, { error: "Could not confirm these numbers belong to your account." });
   const ownedNumbers = new Set((submissions ?? []).map((row) => row.phone_number));
   if (numbers.some((number) => !ownedNumbers.has(number))) return json(403, { error: "Submit these numbers through your account before sending them to DataHub." });
@@ -68,12 +69,12 @@ Deno.serve(async (request: Request) => {
       signal: AbortSignal.timeout(15000),
     });
   } catch {
-    return json(502, { error: "DataHub could not be reached. Wait briefly before retrying." });
+    return json(502, { error: "Could not submit numbers right now. Please try again later." });
   }
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success !== true) {
     const status = response.status === 429 ? 429 : response.status >= 500 ? 502 : response.status === 401 ? 502 : 400;
-    return json(status, { error: payload?.error ?? payload?.message ?? `DataHub beneficiary submission failed (HTTP ${response.status}).` });
+    return json(status, { error: status === 429 ? "Too many requests. Please wait a few minutes and try again." : "Could not submit numbers right now. Please try again later." });
   }
 
   const data = payload.data ?? {};
@@ -83,21 +84,18 @@ Deno.serve(async (request: Request) => {
   const acceptedNumbers = numbers.filter((number) => !invalidNumbers.has(number));
   const rejectedNumbers = numbers.filter((number) => invalidNumbers.has(number));
   const updates = await Promise.all([
-    acceptedNumbers.length ? service.from("number_verification_submissions").update({ datahub_status: "submitted", datahub_submitted_at: submittedAt, updated_at: submittedAt }).eq("user_id", authData.user.id).in("phone_number", acceptedNumbers) : Promise.resolve({ error: null }),
-    rejectedNumbers.length ? service.from("number_verification_submissions").update({ datahub_status: "invalid", datahub_submitted_at: submittedAt, updated_at: submittedAt }).eq("user_id", authData.user.id).in("phone_number", rejectedNumbers) : Promise.resolve({ error: null }),
+    acceptedNumbers.length ? service.from("number_verification_submissions").update({ datahub_status: "submitted", datahub_submitted_at: submittedAt, updated_at: submittedAt }).eq("user_id", userId).in("phone_number", acceptedNumbers) : Promise.resolve({ error: null }),
+    rejectedNumbers.length ? service.from("number_verification_submissions").update({ datahub_status: "invalid", datahub_submitted_at: submittedAt, updated_at: submittedAt }).eq("user_id", userId).in("phone_number", rejectedNumbers) : Promise.resolve({ error: null }),
   ]);
-  if (updates.some((result) => result.error)) return json(503, { error: "DataHub accepted the request, but the submission status could not be saved. Contact support before retrying." });
+  if (updates.some((result) => result.error)) return json(503, { error: "Numbers were submitted, but the result could not be saved. Please check again later." });
 
   return json(200, {
     success: true,
-    message: payload.message ?? `Submitted ${Number(data.submitted ?? acceptedNumbers.length)} number(s) for DataHub beneficiary approval.`,
+    message: `Submitted ${Number(data.submitted ?? acceptedNumbers.length)} number(s) for verification.`,
     data: {
       submitted: Number(data.submitted ?? acceptedNumbers.length),
-      tracked: Number(data.tracked ?? acceptedNumbers.length),
-      numbers: Array.isArray(data.numbers) ? data.numbers : acceptedNumbers,
-      invalid: invalidValues,
-      batches: Number(data.batches ?? 1),
-      maxPerRequest: 30,
+      existing: Number(data.existing ?? 0),
+      invalid: rejectedNumbers.length,
     },
     submitted_at: submittedAt,
   });
