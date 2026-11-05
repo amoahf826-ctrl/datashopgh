@@ -19,50 +19,43 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function validSignature(secret: string, rawBody: string, request: Request): Promise<boolean> {
-  const signatureHeaders = ["X-Webhook-Signature", "X-Webhook-Signature-256", "X-Webhook-Hmac-SHA256",
-    "X-Webhook-HMAC", "X-Hub-Signature-256", "X-Signature", "Signature"];
-  const supplied = signatureHeaders.map((name) => request.headers.get(name)).find((value) => value !== null) ?? null;
-  if (!supplied) return false;
-  const signature = supplied.trim().replace(/^sha256=/i, "");
-  const timestamp = request.headers.get("X-Webhook-Timestamp") ?? "";
-  const messages = [rawBody, ...(timestamp ? [`${timestamp}.${rawBody}`, `${timestamp}${rawBody}`] : [])];
+async function validSignature(secret: string, rawBody: Uint8Array, request: Request): Promise<boolean> {
+  const signature = request.headers.get("X-Webhook-Signature")?.trim() ?? "";
+  if (!/^[a-f0-9]{64}$/i.test(signature)) return false;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  for (const message of messages) {
-    const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message)));
-    const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
-    const bytes = String.fromCharCode(...digest);
-    const base64 = btoa(bytes);
-    const base64url = base64.replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
-    if (constantTimeEqual(signature.toLowerCase(), hex) || constantTimeEqual(signature, base64) ||
-        constantTimeEqual(signature.replace(/=+$/, ""), base64url)) return true;
-  }
-  return false;
+  const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, rawBody));
+  const expected = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return constantTimeEqual(signature.toLowerCase(), expected);
 }
 
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return reply(405, { error: "Method not allowed." });
   const expectedToken = Deno.env.get("DATAHUB_WEBHOOK_TOKEN")?.trim();
-  const suppliedToken = new URL(request.url).searchParams.get("token") ?? "";
-  if (!expectedToken || expectedToken.length < 32) return reply(503, { error: "Webhook authentication is not configured." });
+  if (!expectedToken || expectedToken.length < 32) {
+    console.error("DataHub webhook unavailable: DATAHUB_WEBHOOK_TOKEN is missing or too short.");
+    return reply(503, { error: "Webhook authentication is not configured." });
+  }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const key = serviceKey();
-  if (!supabaseUrl || !key) return reply(503, { error: "Order status service is not configured." });
+  if (!supabaseUrl || !key) {
+    console.error("DataHub webhook unavailable: Supabase order service configuration is incomplete.", {
+      hasSupabaseUrl: !!supabaseUrl, hasServiceKey: !!key,
+    });
+    return reply(503, { error: "Order status service is not configured." });
+  }
 
-  const rawBody = await request.text();
+  const rawBodyBytes = new Uint8Array(await request.arrayBuffer());
+  const rawBody = new TextDecoder().decode(rawBodyBytes);
   let event: any;
   try { event = JSON.parse(rawBody); } catch { return reply(400, { error: "Invalid JSON." }); }
-  const tokenAuthorized = constantTimeEqual(suppliedToken, expectedToken);
-  const signatureAuthorized = await validSignature(expectedToken, rawBody, request).catch(() => false);
-  if (!tokenAuthorized && !signatureAuthorized) {
-    const signatureHeaders = [...request.headers.keys()].filter((name) => /signature|webhook|hmac/i.test(name));
+  const signatureAuthorized = await validSignature(expectedToken, rawBodyBytes, request).catch(() => false);
+  if (!signatureAuthorized) {
     console.warn("DataHub webhook authentication failed", {
-      signatureHeaders, signaturePresent: signatureHeaders.some((name) => request.headers.has(name)),
-      timestampPresent: request.headers.has("X-Webhook-Timestamp"),
+      expectedHeaderPresent: request.headers.has("X-Webhook-Signature"),
     });
-    return reply(401, { error: "Webhook authentication failed. Check the URL token or HMAC Secret Key." });
+    return reply(401, { error: "Webhook signature is missing or invalid. Verify the HMAC secret and raw-body SHA-256 hex signature." });
   }
 
   const eventType = String(event?.event ?? request.headers.get("X-Webhook-Event") ?? "").trim();
@@ -106,6 +99,11 @@ Deno.serve(async (request: Request) => {
     const isDocumentedTestOrder = data.reference === "ORDER_123_1234567890" ||
       Number(data.orderNumber) === 290293;
     if (isDocumentedTestOrder) return reply(200, { received: true, test: true });
+    console.warn("DataHub webhook retry requested: provider reference is not linked to an order.", {
+      eventType, hasOrderNumber: data.orderNumber != null,
+      matchesDocumentedTestReference: data.reference === "ORDER_123_1234567890",
+      matchesDocumentedTestOrderNumber: Number(data.orderNumber) === 290293,
+    });
     return reply(503, { error: "Order reference is not linked yet; retry this webhook." });
   }
 
