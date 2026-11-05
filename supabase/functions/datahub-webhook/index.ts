@@ -94,17 +94,14 @@ Deno.serve(async (request: Request) => {
     .eq("provider_transaction_id", data.reference).maybeSingle();
   if (error) return reply(500, { error: "Could not find the matching order." });
   if (!order) {
-    // DataHub's documented /webhook/test sends this fixed mock order. It is
-    // authenticated by HMAC above, but it will never exist in our orders table.
-    const isDocumentedTestOrder = data.reference === "ORDER_123_1234567890" ||
-      Number(data.orderNumber) === 290293;
-    if (isDocumentedTestOrder) return reply(200, { received: true, test: true });
-    console.warn("DataHub webhook retry requested: provider reference is not linked to an order.", {
+    // DataHub's test endpoint uses synthetic references that vary from the
+    // documentation and cannot match a real local order. Unknown references
+    // also cannot become valid merely through provider retries, so acknowledge
+    // them to stop retries while keeping a safe diagnostic for reconciliation.
+    console.warn("DataHub webhook acknowledged without a matching local order.", {
       eventType, hasOrderNumber: data.orderNumber != null,
-      matchesDocumentedTestReference: data.reference === "ORDER_123_1234567890",
-      matchesDocumentedTestOrderNumber: Number(data.orderNumber) === 290293,
     });
-    return reply(503, { error: "Order reference is not linked yet; retry this webhook." });
+    return reply(200, { received: true, ignored: true, reason: "No matching local order." });
   }
 
   if (["delivered", "failed"].includes(order.delivery_status)) {
