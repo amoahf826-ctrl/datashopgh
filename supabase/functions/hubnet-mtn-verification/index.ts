@@ -76,7 +76,7 @@ Deno.serve(async (request: Request) => {
       try {
         const response = await fetch(endpoint, {
           method: "GET", headers: { token: tokenHeader, Accept: "application/json" },
-          signal: AbortSignal.timeout(12000),
+          signal: AbortSignal.timeout(2000),
         });
         const payload = await response.json().catch(() => null);
         const envelope = payload?.response ?? payload;
@@ -84,14 +84,13 @@ Deno.serve(async (request: Request) => {
         const status = String(data?.status ?? "").toLowerCase();
         if (!response.ok || !(envelope?.status === true || envelope?.status === "success" || payload?.status === true || payload?.status === "success") || !["verified","unverified","queued","invalid"].includes(status) ||
             (data?.number != null && normalizedNumber(data.number) !== number)) {
-          const providerMessage = envelope?.message ?? envelope?.error ?? payload?.message ?? payload?.error;
-          results[index] = { number, error: typeof providerMessage === "string" ? providerMessage.slice(0, 240) : `Hubnet returned HTTP ${response.status} without a recognized verification status.`, http_status: response.status };
+          results[index] = { number, error: "Could not verify right now. Please try again.", http_status: response.status };
         } else {
           const requestId = envelope?.request_id ?? payload?.request_id;
-          results[index] = { number, status: status as Result["status"], status_label: status, request_id: typeof requestId === "string" ? requestId : null };
+          results[index] = { number, status: status as Result["status"], request_id: typeof requestId === "string" ? requestId : null };
         }
       } catch (error) {
-        results[index] = { number, error: error instanceof Error && error.name === "TimeoutError" ? "Hubnet request timed out. Retry this number." : "Could not reach Hubnet. Check the function logs and retry.", http_status: 0 };
+        results[index] = { number, error: "Could not verify right now. Please try again.", http_status: 0 };
       }
     }
   }

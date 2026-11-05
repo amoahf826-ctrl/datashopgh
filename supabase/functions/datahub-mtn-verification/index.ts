@@ -65,9 +65,8 @@ Deno.serve(async (request: Request) => {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-API-Key": datahubKey, Accept: "application/json" },
           body: JSON.stringify({ phone: number, is_ported_number: true }),
-          // DataHub's live verification endpoint may take longer while it
-          // checks or queues a number; allow it up to 30 seconds to respond.
-          signal: AbortSignal.timeout(30000),
+          // Keep the live status response quick for storefront and agent flows.
+          signal: AbortSignal.timeout(2000),
         });
         const payload = await response.json().catch(() => null);
         const providerMessage = String(payload?.error ?? payload?.message ?? "");
@@ -76,21 +75,19 @@ Deno.serve(async (request: Request) => {
         const explicitlyUnverified = payload?.data?.verified === false || payload?.data?.exists === false ||
           /phone number not verified|not added to.*beneficiar/i.test(providerMessage);
         if (response.ok && explicitlyVerified) {
-          const statusLabel = String(payload?.data?.message ?? "").trim();
-          results[index] = { number, status: "verified", ...(statusLabel ? { status_label: statusLabel.slice(0, 120) } : {}) };
+          results[index] = { number, status: "verified" };
         } else if ((response.ok || response.status === 400) && explicitlyUnverified) {
-          const statusLabel = String(payload?.error ?? "").trim();
-          results[index] = { number, status: "unverified", ...(statusLabel ? { status_label: statusLabel.slice(0, 120) } : {}) };
+          results[index] = { number, status: "unverified" };
         } else if (response.status === 400 && payload?.success === false) {
           results[index] = { number, status: "invalid" };
         } else {
-          results[index] = { number, error: providerMessage ? providerMessage.slice(0, 240) : `DataHub returned HTTP ${response.status} without a recognized verification status.`, http_status: response.status };
+        results[index] = { number, error: "Could not verify right now. Please try again.", http_status: response.status };
         }
       } catch (error) {
         const timedOut = error instanceof Error && error.name === "TimeoutError";
         if (timedOut) console.warn("DataHub number verification timed out.");
         else console.error("DataHub number verification request failed.", error instanceof Error ? error.message : "Unknown request error");
-        results[index] = { number, error: timedOut ? "DataHub verification timed out after 30 seconds. Retry this number." : "Could not reach DataHub. Check the function logs and retry.", http_status: 0 };
+        results[index] = { number, error: "Could not verify right now. Please try again.", http_status: 0 };
       }
     }
   }
