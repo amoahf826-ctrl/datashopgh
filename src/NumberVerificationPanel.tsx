@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ArrowRight, CheckCircle2, ChevronDown, RefreshCw, ShieldCheck, X, XCircle } from 'lucide-react';
+import { ArrowRight, ChevronDown, RefreshCw, ShieldCheck, X } from 'lucide-react';
 
 type VerificationRow = { id:string; phone_number:string; verification_status:'unchecked'|'verified'|'unverified'|'queued'|'invalid'; created_at:string };
 const normalize=(value:string)=>{const digits=value.replace(/\D/g,'');if(digits.length===12&&digits.startsWith('233'))return`0${digits.slice(3)}`;if(digits.length===9&&!digits.startsWith('0'))return`0${digits}`;return digits};
