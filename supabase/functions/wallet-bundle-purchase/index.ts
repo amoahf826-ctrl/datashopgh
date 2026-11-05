@@ -117,7 +117,16 @@ Deno.serve(async (request: Request) => {
     if (activeProvider === "datahub") {
       delivery = await fetch("https://app.datahubgh.com/api/external/data-purchase", {
         method: "POST",
-        headers: { "X-API-Key": datahubKey!, "Content-Type": "application/json", Accept: "application/json" },
+        // DataHub API keys are registered against the storefront Website URL.
+        // Include that origin on this server-side request so the provider can
+        // associate the purchase with the registered site.
+        headers: {
+          "X-API-Key": datahubKey!,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Origin: "https://cheapdatabundle.amoahf826.workers.dev",
+          Referer: "https://cheapdatabundle.amoahf826.workers.dev/",
+        },
         body: JSON.stringify({ networkKey, recipient: body.recipient_phone, capacity }),
         signal: AbortSignal.timeout(15000),
       });
