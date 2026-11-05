@@ -70,7 +70,35 @@ Deno.serve(async (request: Request) => {
   });
   if (depositError || !deposit) return json(400, { error: depositError?.message ?? "Could not create the wallet deposit." });
   if (deposit.status !== "pending") return json(409, { error: "This wallet deposit is no longer pending. Start a new top-up." });
-  if (deposit.checkout_url) return json(200, { authorization_url: deposit.checkout_url, reference: deposit.reference });
+  if (deposit.checkout_url) return json(200, { authorization_url: deposit.checkout_url, reference: deposit.reference,
+    wallet_amount: Number(deposit.amount), fee_amount: Number(deposit.fee_amount ?? 0), charge_amount: Number(deposit.charge_amount ?? deposit.amount) });
+
+  const walletCents = Math.round(amount * 100);
+  let chargeCents: number;
+  let feeCents: number;
+  const storedCharge = Number(deposit.charge_amount);
+  if (Number.isFinite(storedCharge) && storedCharge >= Number(deposit.amount)) {
+    chargeCents = Math.round(storedCharge * 100);
+    feeCents = chargeCents - walletCents;
+  } else {
+    const { data: feeSetting, error: feeSettingError } = await service.from("platform_settings")
+      .select("value").eq("key", "paystack_fee_recovery").maybeSingle();
+    if (feeSettingError) return json(503, { error: "Could not load the Paystack fee configuration. Please retry shortly." });
+    const feeEnabled = feeSetting?.value?.enabled === true;
+    const ratePercent = feeEnabled ? Number(feeSetting?.value?.rate_percent) : 0;
+    if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 10 || ratePercent >= 100) {
+      return json(503, { error: "The Paystack fee configuration is invalid. Contact the administrator." });
+    }
+    chargeCents = ratePercent > 0 ? Math.ceil(walletCents / (1 - ratePercent / 100)) : walletCents;
+    feeCents = chargeCents - walletCents;
+  }
+  if (chargeCents > 1000000) return json(400, { error: "The top-up plus fee exceeds the GHS 10,000.00 Paystack limit. Choose a smaller wallet top-up." });
+  const chargeAmount = chargeCents / 100;
+  const feeAmount = feeCents / 100;
+  const { error: prepareError } = await service.rpc("prepare_paystack_wallet_deposit_charge", {
+    p_deposit_id: deposit.id, p_fee_amount: feeAmount, p_charge_amount: chargeAmount,
+  });
+  if (prepareError) return json(409, { error: "This wallet top-up fee quote changed or is no longer pending. Start a new top-up." });
 
   const callback = new URL(base.origin);
   callback.searchParams.set("wallet_deposit", "complete");
@@ -80,7 +108,7 @@ Deno.serve(async (request: Request) => {
       method: "POST",
       headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
-        email: authData.user.email, amount: Math.round(Number(deposit.amount) * 100), currency: "GHS",
+        email: authData.user.email, amount: chargeCents, currency: "GHS",
         reference: deposit.reference, callback_url: callback.toString(),
         metadata: { kind: "wallet_deposit", deposit_id: deposit.id, user_id: authData.user.id },
       }),
@@ -91,10 +119,11 @@ Deno.serve(async (request: Request) => {
       return json(502, { error: "Paystack could not start the wallet top-up. No payment was taken." });
     }
     const { error: saveError } = await service.rpc("save_wallet_deposit_checkout_url", {
-      p_deposit_id: deposit.id, p_url: result.data.authorization_url,
+      p_deposit_id: deposit.id, p_url: result.data.authorization_url, p_fee_amount: feeAmount, p_charge_amount: chargeAmount,
     });
     if (saveError) return json(502, { error: "Checkout could not be safely saved. No payment was taken; retry shortly." });
-    return json(200, { authorization_url: result.data.authorization_url, reference: deposit.reference });
+    return json(200, { authorization_url: result.data.authorization_url, reference: deposit.reference,
+      wallet_amount: Number(deposit.amount), fee_amount: feeAmount, charge_amount: chargeAmount });
   } catch {
     return json(502, { error: "Could not reach Paystack. No payment was taken." });
   }

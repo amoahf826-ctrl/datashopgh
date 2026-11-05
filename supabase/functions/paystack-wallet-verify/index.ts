@@ -45,7 +45,7 @@ Deno.serve(async (request: Request) => {
 
   const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: deposit, error: depositError } = await service.from("deposits")
-    .select("id,user_id,amount,status,provider_reference,checkout_url")
+    .select("id,user_id,amount,fee_amount,charge_amount,status,provider_reference,checkout_url")
     .eq("provider", "paystack").eq("provider_reference", body.reference).eq("user_id", authData.user.id).maybeSingle();
   if (depositError || !deposit) return json(404, { error: "This wallet deposit was not found for your account." });
   if (deposit.status === "successful") {
@@ -63,14 +63,16 @@ Deno.serve(async (request: Request) => {
     const transaction = result?.data;
     if (!response.ok || result?.status !== true || transaction?.status !== "success" ||
         transaction?.reference !== body.reference || transaction?.currency !== "GHS" ||
-        !Number.isSafeInteger(transaction?.amount) || transaction.amount !== Math.round(Number(deposit.amount) * 100)) {
+        !Number.isSafeInteger(transaction?.amount) || transaction.amount !== Math.round(Number(deposit.charge_amount ?? deposit.amount) * 100)) {
       return json(200, { success: false, message: "Paystack has not confirmed this wallet payment yet." });
     }
     const { data: claim, error: claimError } = await service.rpc("claim_paystack_wallet_deposit", {
       p_reference: body.reference, p_amount: transaction.amount, p_currency: transaction.currency,
     });
     if (claimError || !claim) return json(500, { error: "Verified wallet payment could not be credited. Contact support with your reference." });
-    return json(200, { success: true, credited: claim.credited, balance: Number(claim.balance ?? 0), message: "Wallet payment verified." });
+    return json(200, { success: true, credited: claim.credited, balance: Number(claim.balance ?? 0),
+      wallet_amount: Number(claim.amount_credited ?? deposit.amount), fee_amount: Number(deposit.fee_amount ?? 0),
+      charge_amount: Number(deposit.charge_amount ?? deposit.amount), message: "Wallet payment verified." });
   } catch {
     return json(502, { error: "Could not verify payment with Paystack. The webhook will retry if payment succeeded." });
   }

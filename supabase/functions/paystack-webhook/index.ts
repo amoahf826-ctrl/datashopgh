@@ -53,7 +53,7 @@ Deno.serve(async (request: Request) => {
   const reference = event.data.reference as string;
 
   const { data: deposit, error: depositError } = await service.from("deposits")
-    .select("id,amount,status").eq("provider", "paystack").eq("provider_reference", reference).maybeSingle();
+    .select("id,amount,fee_amount,charge_amount,status").eq("provider", "paystack").eq("provider_reference", reference).maybeSingle();
   if (depositError) return response(500, { error: "Could not load the wallet deposit." });
   if (deposit) {
     if (deposit.status === "successful") return response(200, { received: true, duplicate: true });
@@ -67,7 +67,7 @@ Deno.serve(async (request: Request) => {
       const transaction = result?.data;
       if (!verified.ok || result?.status !== true || transaction?.status !== "success" ||
           transaction?.reference !== reference || transaction?.currency !== "GHS" ||
-          Number(transaction?.amount) !== Math.round(Number(deposit.amount) * 100)) {
+          Number(transaction?.amount) !== Math.round(Number(deposit.charge_amount ?? deposit.amount) * 100)) {
         return response(200, { received: true, verified: false });
       }
       const { error: claimError } = await service.rpc("claim_paystack_wallet_deposit", {
