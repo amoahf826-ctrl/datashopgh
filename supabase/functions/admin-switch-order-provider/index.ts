@@ -23,7 +23,7 @@ Deno.serve(async(request)=>{
   const supabaseWebhook=`${url.replace(/\/+$/,"")}/functions/v1/hubnet-webhook`;
   try{
     let response:Response;
-    if(provider==="datahub")response=await fetch("https://app.datahubgh.com/api/external/data-purchase",{method:"POST",headers:{"X-API-Key":datahubKey!,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({networkKey,recipient:order.phone,capacity:String(Number((Number(size[1])*(size[2].toUpperCase()==="GB"?1:.001)).toFixed(3)))}),signal:AbortSignal.timeout(15000)});
+    if(provider==="datahub")response=await fetch("https://user.datahubgh.com/api/external/data-purchase",{method:"POST",headers:{"X-API-Key":datahubKey!,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({networkKey,recipient:order.phone,capacity:String(Number((Number(size[1])*(size[2].toUpperCase()==="GB"?1:.001)).toFixed(3)))}),signal:AbortSignal.timeout(15000)});
     else{
       const path=networkKey==="AT_BIGTIME"?"big-time-new-transaction":networkKey==="TELECEL"?"telecel-new-transaction":networkKey==="AT_PREMIUM"?"at-new-transaction":"mtn-new-transaction";
       const token=/^Bearer\s+/i.test(hubnetToken!)?hubnetToken!:`Bearer ${hubnetToken}`;

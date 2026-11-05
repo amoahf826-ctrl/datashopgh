@@ -115,7 +115,7 @@ Deno.serve(async (request: Request) => {
   try {
     let delivery: Response;
     if (activeProvider === "datahub") {
-      delivery = await fetch("https://app.datahubgh.com/api/external/data-purchase", {
+      delivery = await fetch("https://user.datahubgh.com/api/external/data-purchase", {
         method: "POST",
         // DataHub API keys are registered against the storefront Website URL.
         // Include that origin on this server-side request so the provider can

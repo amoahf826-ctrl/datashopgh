@@ -59,7 +59,7 @@ Deno.serve(async (request: Request) => {
 
   let response: Response;
   try {
-    response = await fetch("https://app.datahubgh.com/api/external/beneficiaries", {
+    response = await fetch("https://user.datahubgh.com/api/external/beneficiaries", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-API-Key": datahubKey, Accept: "application/json" },
       body: JSON.stringify({ numbers }),

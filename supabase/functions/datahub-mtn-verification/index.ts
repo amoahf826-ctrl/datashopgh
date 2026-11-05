@@ -61,7 +61,7 @@ Deno.serve(async (request: Request) => {
       const index = next++;
       const number = numbers[index];
       try {
-        const response = await fetch("https://app.datahubgh.com/api/external/verify", {
+        const response = await fetch("https://user.datahubgh.com/api/external/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-API-Key": datahubKey, Accept: "application/json" },
           body: JSON.stringify({ networkKey, recipient: number, is_ported_number: true }),

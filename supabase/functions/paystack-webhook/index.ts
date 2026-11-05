@@ -143,7 +143,7 @@ Deno.serve(async (request: Request) => {
   try {
     let delivery: Response;
     if (activeProvider === "datahub") {
-      delivery = await fetch("https://app.datahubgh.com/api/external/data-purchase", {
+      delivery = await fetch("https://user.datahubgh.com/api/external/data-purchase", {
         method: "POST",
         headers: { "X-API-Key": datahubKey!, "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ networkKey, recipient: claim.phone, capacity }),
