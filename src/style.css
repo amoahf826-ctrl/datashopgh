@@ -540,3 +540,15 @@
 .auth-modal .switch-auth button,
 .auth-modal .inline-error { font-size:14px; }
 .auth-modal .form-input { height:46px; }
+
+/* Unified back-button treatment across customer, agent, and admin views. */
+.network-page-back,
+.agent-back,
+.agent-back-button,
+.admin-back-button,
+.track-header > button,
+.agent-buy-title > button {
+  color: #080808 !important;
+  border-color: #8b6500 !important;
+  background-color: #fff !important;
+}
