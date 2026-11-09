@@ -321,3 +321,5 @@ body { background: linear-gradient(135deg,#fff9df 0%,#f7edd1 48%,#fff3d1 100%); 
   font-size: 16px;
   line-height: 1.4;
 }
+
+.site-back-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:7px!important;min-height:44px!important;padding:0 14px!important;border:1px solid #8b6500!important;border-radius:12px!important;background:#f5bd19!important;color:#080808!important;box-shadow:0 3px 0 #8b6500,0 5px 12px #20160020!important;font:700 12px 'DM Sans',sans-serif!important;white-space:nowrap;cursor:pointer}.site-back-button:hover{background:#e6a900!important}.site-back-button:focus-visible{outline:3px solid #17120a;outline-offset:3px}

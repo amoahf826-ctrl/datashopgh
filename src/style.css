@@ -563,3 +563,5 @@
 .bulk-wallet-balance-note{margin:0 0 14px;padding:11px 13px;border:1px solid #e8e1ef;border-radius:11px;background:#faf8fc;color:#5f5969;font:500 12px/1.5 'DM Sans',sans-serif}.bulk-wallet-balance-note b{color:#251a32;font-weight:800}
 
 .app-chunk-loading{min-height:100svh;display:grid;place-items:center;margin:0;background:#fbf8f1;color:#261a36;font:700 15px 'DM Sans',sans-serif}
+
+.toast{z-index:1200!important}
