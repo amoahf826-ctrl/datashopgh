@@ -39,6 +39,7 @@ Deno.serve(async (request: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = readSupabaseServiceKey();
   const datahubKey = Deno.env.get("DATAHUB_API_KEY")?.trim();
+  const appBase = (Deno.env.get("APP_BASE_URL")?.trim() || "https://cheapdatabundle.wittymultimedia.com").replace(/\/+$/, "");
   if (!secret || !supabaseUrl || !serviceKey) return response(503, { error: "Paystack webhook service is not configured." });
 
   const raw = await request.text();
@@ -93,6 +94,12 @@ Deno.serve(async (request: Request) => {
   const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
   const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://console.hubnet.app").replace(/\/+$/, "");
   if (activeProvider === "datahub" && !datahubKey) return response(503, { error: "DataHub delivery is not configured; Paystack may retry this webhook." });
+  let appOrigin: string;
+  try {
+    const base = new URL(appBase);
+    if (base.protocol !== "https:" || base.pathname !== "/" || base.username || base.password || base.search || base.hash) throw new Error();
+    appOrigin = base.origin;
+  } catch { return response(503, { error: "APP_BASE_URL must be a secure site origin." }); }
   if (activeProvider === "hubnet" && !hubnetToken) return response(503, { error: "Hubnet delivery is not configured; Paystack may retry this webhook." });
   if (activeProvider === "hubnet") {
     try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "console.hubnet.app" || base.username || base.password) throw new Error(); }
@@ -145,7 +152,7 @@ Deno.serve(async (request: Request) => {
     if (activeProvider === "datahub") {
       delivery = await fetch("https://user.datahubgh.com/api/external/data-purchase", {
         method: "POST",
-        headers: { "X-API-Key": datahubKey!, "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "X-API-Key": datahubKey!, "Content-Type": "application/json", Accept: "application/json", Origin: appOrigin, Referer: `${appOrigin}/` },
         body: JSON.stringify({ networkKey, recipient: claim.phone, capacity }),
         signal: AbortSignal.timeout(15000),
       });

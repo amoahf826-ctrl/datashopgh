@@ -39,6 +39,7 @@ Deno.serve(async (request: Request) => {
   const serviceKey = readKey("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
   const datahubKey = Deno.env.get("DATAHUB_API_KEY")?.trim();
   const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
+  const appBase = (Deno.env.get("APP_BASE_URL")?.trim() || "https://cheapdatabundle.wittymultimedia.com").replace(/\/+$/, "");
   const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://console.hubnet.app").replace(/\/+$/, "");
   if (!supabaseUrl || !anonKey || !serviceKey) {
     return json(503, { error: "Wallet bundle delivery is not fully configured on the server." });
@@ -68,6 +69,12 @@ Deno.serve(async (request: Request) => {
     try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "console.hubnet.app" || base.username || base.password) throw new Error(); }
     catch { return json(503, { error: "HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin." }); }
   }
+  let appOrigin: string;
+  try {
+    const base = new URL(appBase);
+    if (base.protocol !== "https:" || base.pathname !== "/" || base.username || base.password || base.search || base.hash) throw new Error();
+    appOrigin = base.origin;
+  } catch { return json(503, { error: "APP_BASE_URL must be a secure site origin." }); }
   const { data: sales, error: settingError } = await service.from("platform_settings")
     .select("value").eq("key", "storefront_live_sales").maybeSingle();
   if (settingError || sales?.value?.enabled !== true) return json(503, { error: "Live bundle sales are currently unavailable." });
@@ -124,8 +131,8 @@ Deno.serve(async (request: Request) => {
           "X-API-Key": datahubKey!,
           "Content-Type": "application/json",
           Accept: "application/json",
-          Origin: "https://cheapdatabundle.amoahf826.workers.dev",
-          Referer: "https://cheapdatabundle.amoahf826.workers.dev/",
+          Origin: appOrigin,
+          Referer: `${appOrigin}/`,
         },
         body: JSON.stringify({ networkKey, recipient: body.recipient_phone, capacity }),
         signal: AbortSignal.timeout(15000),
