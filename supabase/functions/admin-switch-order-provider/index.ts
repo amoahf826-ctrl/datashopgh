@@ -18,7 +18,7 @@ Deno.serve(async(request)=>{
   if(provider==="datahub"&&!datahubKey||provider==="hubnet"&&!hubnetToken){await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});return reply(503,{error:`${provider==="hubnet"?"Hubnet":"DataHub GH"} credentials are not configured.`})}
   if(provider==="hubnet")try{const base=new URL(hubnetBase);if(base.protocol!=="https:"||base.hostname!=="console.hubnet.app"||base.username||base.password)throw new Error()}catch{await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});return reply(503,{error:"HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin."})}
   const size=String(order.size??"").match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i),category=`${order.category} ${order.subcategory}`.toLowerCase();
-  const network=String(order.network),networkKey=network==="MTN"?(/xpress|express/.test(category)?"mtn_xpress":"YELLO"):network==="Telecel"?"TELECEL":network==="AT"?(/big[\s-]?time/.test(category)?"AT_BIGTIME":"AT_PREMIUM"):null;
+  const network=String(order.network),networkKey=network==="MTN"?"YELLO":network==="Telecel"?"TELECEL":network==="AT"?(/big[\s-]?time/.test(category)?"AT_BIGTIME":"AT_PREMIUM"):null;
   if(!size||!networkKey){await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});return reply(422,{error:"The order plan could not be mapped to a provider network and bundle size."})}
   const supabaseWebhook=`${url.replace(/\/+$/,"")}/functions/v1/hubnet-webhook`;
   try{

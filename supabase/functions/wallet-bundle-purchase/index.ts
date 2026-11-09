@@ -104,7 +104,7 @@ Deno.serve(async (request: Request) => {
     : { data: null };
   const category = `${plan?.category ?? ""} ${plan?.subcategory ?? ""}`.toLowerCase();
   const networkKey = String(order.network) === "MTN"
-    ? (/xpress|express/.test(category) ? "mtn_xpress" : "YELLO")
+    ? "YELLO"
     : String(order.network) === "Telecel" ? "TELECEL"
     : String(order.network) === "AT" ? (/big[\s-]?time/.test(category) ? "AT_BIGTIME" : "AT_PREMIUM") : null;
   const size = String(order.size ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i);
