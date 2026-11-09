@@ -8,7 +8,7 @@ import InfoLibrary from './InfoLibrary';
 import afaImage from './assets/afa.jpeg';
 import tigoBigTimeLogo from './assets/tigo-bigtime.png';
 import infoCodesFolderLogo from './assets/info-codes-folder.png';
-import cheapDataBundleLogo from './assets/cheapdatabundle-logo.png';
+import cheapDataBundleLogo from './assets/cheapdatabundle-logo.jpg';
 import { ArrowLeft, ArrowRight, BookOpen, ChevronRight, Clock3, Download, FileSpreadsheet, FolderOpen, Home, Info, Menu, Phone, Radio, Search, Share2, UserPlus, Users, Upload, X, Zap, ClipboardList, Send } from 'lucide-react';
 
 type Network='MTN'|'Telecel'|'AT'; export type Bundle={id:string;network:Network;size:string;price:number;validity:string;category?:string;subcategory?:string;popular?:boolean};

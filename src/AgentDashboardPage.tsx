@@ -6,7 +6,7 @@ import { AgentBuyDataPanel, AirtimePlanPanel, type Bundle } from './Storefront';
 import PublicAnnouncements, { type PublicAnnouncement } from './PublicAnnouncements';
 import AgentCashoutPage from './AgentCashoutPage';
 import InfoLibrary from './InfoLibrary';
-import cheapDataBundleLogo from './assets/cheapdatabundle-logo.png';
+import cheapDataBundleLogo from './assets/cheapdatabundle-logo.jpg';
 import NumberVerificationPanel from './NumberVerificationPanel';
 import OrderComplaintAction from './OrderComplaintAction';
 

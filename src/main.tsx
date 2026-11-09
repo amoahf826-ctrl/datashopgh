@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './style.css';
@@ -13,4 +13,4 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><Suspense fallback={<main className="app-chunk-loading" role="status">Loading CheapDataBundle…</main>}><App /></Suspense></React.StrictMode>);

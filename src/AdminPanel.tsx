@@ -8,7 +8,7 @@ import NetworkLogo from './NetworkLogo';
 import afaImage from './assets/afa.jpeg';
 import type { DataNetwork } from './NetworkLogo';
 import AdminHelpLibrary from './AdminHelpLibrary';
-import cheapDataBundleLogo from './assets/cheapdatabundle-logo.png';
+import cheapDataBundleLogo from './assets/cheapdatabundle-logo.jpg';
 import OrderComplaintsAdmin from './OrderComplaintsAdmin';
 import PaystackFeeRecoveryAdmin from './PaystackFeeRecoveryAdmin';
 

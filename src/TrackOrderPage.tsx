@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, Search, ShieldCheck, XCircle, Clipboard } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import cheapDataBundleLogo from './assets/cheapdatabundle-logo.png';
+import cheapDataBundleLogo from './assets/cheapdatabundle-logo.jpg';
 
 type TrackOrder={id:string;recipient_phone:string;status:'pending'|'processing'|'successful'|'failed';delivery_status?:'pending'|'processing'|'delivered'|'failed'|null;price:number;created_at:string;bundles?:{size:string;network:string}|null};
 export default function TrackOrderPage({client,user,demoOrders,onBack,onLogin}:{client:SupabaseClient|null;user:any;demoOrders:Array<{id:string;phone:string;network:string;bundle:string;price:number;status:string;date:string}>;onBack:()=>void;onLogin:()=>void}){

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import PublicAnnouncements, { type PublicAnnouncement } from './PublicAnnouncements';
-import cheapDataBundleLogo from './assets/cheapdatabundle-logo.png';
+import cheapDataBundleLogo from './assets/cheapdatabundle-logo.jpg';
 import NumberVerificationPanel from './NumberVerificationPanel';
 import OrderComplaintAction from './OrderComplaintAction';
 import type { SupabaseClient } from '@supabase/supabase-js';
