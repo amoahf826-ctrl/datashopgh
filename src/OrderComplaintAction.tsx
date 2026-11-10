@@ -48,23 +48,36 @@ export default function OrderComplaintAction({ client, userId, orderId, delivere
     event.preventDefault();
     setSaving(true);
     setNotice('');
-    const { error } = await client!.from('order_complaints').insert({
-      order_id: orderId,
-      user_id: userId,
-      message: complaintText(order, message),
-    });
-    setSaving(false);
-    if (error) {
-      if (error.code === '23505') {
-        const { data } = await client!.from('order_complaints').select('status').eq('order_id', orderId).eq('user_id', userId).maybeSingle();
-        if (data?.status && data.status in statusLabels) setComplaintStatus(data.status as ComplaintStatus);
-        setNotice('A complaint has already been submitted for this order.');
-      } else setNotice('Could not send your complaint. Please refresh and try again.');
-      return;
+    try {
+      const { error } = await client!.from('order_complaints').insert({
+        order_id: orderId,
+        user_id: userId,
+        message: complaintText(order, message),
+      });
+      if (error) {
+        if (error.code === '23505') {
+          const { data } = await client!.from('order_complaints').select('status').eq('order_id', orderId).eq('user_id', userId).maybeSingle();
+          if (data?.status && data.status in statusLabels) setComplaintStatus(data.status as ComplaintStatus);
+          setNotice(data?.status ? 'A complaint has already been submitted for this order.' : 'This order already has a complaint. Refresh the page to see its status.');
+        } else if (error.code === '42P01' || error.code === 'PGRST205') {
+          setNotice('Complaint reporting is not enabled yet. Please contact support.');
+        } else if (error.code === '42501') {
+          setNotice('This order could not be matched to your signed-in account. Refresh and try again.');
+        } else if (error.code === '23514') {
+          setNotice('The complaint details could not be saved. Shorten the additional details and try again.');
+        } else {
+          setNotice(`Complaint could not be submitted (${error.code || 'connection error'}). Please try again.`);
+        }
+        return;
+      }
+      setComplaintStatus('open');
+      setOpen(false);
+      setMessage('');
+    } catch {
+      setNotice('The complaint could not reach the server. Check your connection and try again.');
+    } finally {
+      setSaving(false);
     }
-    setComplaintStatus('open');
-    setOpen(false);
-    setMessage('');
   }
 
   return <div className="order-complaint-action">
