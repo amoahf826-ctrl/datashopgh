@@ -37,6 +37,22 @@ Deno.serve(async (request: Request) => {
 
   let body: { operation?: string; audience?: string; sender?: string; message?: string; recipients?: unknown };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }
+  if (body.operation === "status") {
+    const { data: settings, error: settingsError } = await service.from("sms_provider_settings").select("sender_id").eq("id", true).maybeSingle();
+    if (settingsError) return json(503, { error: "SMS provider settings could not be loaded. Apply the SMS provider migration." });
+    const senderConfigured = Boolean(String(settings?.sender_id ?? "").trim());
+    const apiKeyConfigured = Boolean(apiKey);
+    const configured = apiKeyConfigured && senderConfigured;
+    return json(200, {
+      success: true,
+      configured,
+      apiKeyConfigured,
+      senderConfigured,
+      message: configured
+        ? "API key and sender ID are configured. Live connection is confirmed when SMSNotifyGH accepts a message."
+        : `SMS setup incomplete: ${!apiKeyConfigured ? "API key is missing" : ""}${!apiKeyConfigured && !senderConfigured ? " and " : ""}${!senderConfigured ? "sender ID is missing" : ""}.`,
+    });
+  }
   if (body.operation === "balance") return json(501, { error: "SMSNotifyGH does not document an API credit-balance endpoint. Check credits in the SMS bundles page." });
   if (!apiKey) return json(503, { error: "Add SMSNOTIFYGH_API_KEY to Supabase Edge Function secrets first." });
 
@@ -48,7 +64,7 @@ Deno.serve(async (request: Request) => {
   if (!sender || sender.length > 11) return json(400, { error: "Set your SMSNotifyGH sender ID (maximum 11 characters)." });
   if (!message || message.length > 1600) return json(400, { error: "Message must contain 1 to 1600 characters." });
   if (!recipients.length || recipients.length > 500) return json(400, { error: "Choose 1 to 500 valid Ghanaian mobile numbers." });
-  const allowedAudiences = ["all_agents", "overdraft_agents", "negative_balance_agents", "all_customers", "custom_numbers"];
+  const allowedAudiences = ["all_agents", "overdraft_agents", "negative_balance_agents", "all_customers", "today_customers", "yesterday_customers", "custom_numbers"];
   const audience = allowedAudiences.includes(String(body.audience)) ? String(body.audience) : "custom_numbers";
 
   const { data: campaign, error: insertError } = await service.from("bulk_sms_campaigns").insert({
