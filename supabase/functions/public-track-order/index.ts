@@ -23,31 +23,20 @@ function serviceKey(): string | undefined {
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
-  let body: { phone?: unknown; reference?: unknown };
+  let body: { phone?: unknown };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }
   const phone = typeof body.phone === "string" ? body.phone.trim() : "";
-  const reference = typeof body.reference === "string" ? body.reference.trim().toUpperCase() : "";
-  if (!/^0\d{9}$/.test(phone) || !/^DSGH-[0-9A-F]{32}$/.test(reference)) {
-    return json(400, { error: "Enter the recipient phone number and the order reference from your Paystack receipt." });
-  }
+  if (!/^0\d{9}$/.test(phone)) return json(400, { error: "Enter a valid 10-digit Ghana phone number." });
+
+  const rawIp = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0];
+  const clientIp = rawIp?.trim() ?? "";
+  if (clientIp.length < 3 || clientIp.length > 64) return json(503, { error: "Order tracking is temporarily unavailable." });
   const url = Deno.env.get("SUPABASE_URL");
   const key = serviceKey();
   if (!url || !key) return json(503, { error: "Order tracking is temporarily unavailable." });
   const service = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await service.from("orders")
-    .select("id,recipient_phone,status,payment_status,delivery_status,price,created_at,bundles(size,network)")
-    .eq("payment_reference", reference).eq("recipient_phone", phone).eq("is_demo", false).maybeSingle();
-  if (error) return json(500, { error: "Could not check this order. Please try again." });
-  if (!data) return json(200, { order: null });
-  const row = data as any;
-  return json(200, { order: {
-    id: row.id,
-    recipient_phone: row.recipient_phone,
-    status: row.status,
-    payment_status: row.payment_status,
-    delivery_status: row.delivery_status,
-    price: row.price,
-    created_at: row.created_at,
-    bundles: Array.isArray(row.bundles) ? row.bundles[0] ?? null : row.bundles ?? null,
-  } });
+  const { data, error } = await service.rpc("public_track_orders_by_phone", { p_phone: phone, p_client_ip: clientIp });
+  if (error) return json(500, { error: "Could not check your orders. Please try again." });
+  if (data?.rate_limited) return json(429, { error: "Too many tracking searches. Please wait a few minutes and try again." });
+  return json(200, { orders: Array.isArray(data?.orders) ? data.orders : [] });
 });
