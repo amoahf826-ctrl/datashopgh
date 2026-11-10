@@ -89,7 +89,7 @@ Deno.serve(async (request: Request) => {
     if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 10 || ratePercent >= 100) {
       return json(503, { error: "The Paystack fee configuration is invalid. Contact the administrator." });
     }
-    chargeCents = ratePercent > 0 ? Math.ceil(walletCents / (1 - ratePercent / 100)) : walletCents;
+    chargeCents = walletCents + Math.round(walletCents * ratePercent / 100);
     feeCents = chargeCents - walletCents;
   }
   if (chargeCents > 1000000) return json(400, { error: "The top-up plus fee exceeds the GHS 10,000.00 Paystack limit. Choose a smaller wallet top-up." });

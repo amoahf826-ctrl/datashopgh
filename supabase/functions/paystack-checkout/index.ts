@@ -63,18 +63,38 @@ Deno.serve(async (request: Request) => {
   if (orderError || !order) return json(400, { error: orderError?.message ?? "Could not create the order." });
   if (order.checkout_url) return json(200, { authorization_url: order.checkout_url, reference: order.payment_reference });
 
+  const { data: feeSetting, error: feeSettingError } = await service.from("platform_settings")
+    .select("value").eq("key", "paystack_fee_recovery").maybeSingle();
+  if (feeSettingError) return json(503, { error: "Could not load the Paystack fee configuration. Please retry shortly." });
+  const feeEnabled = feeSetting?.value?.enabled === true;
+  const ratePercent = feeEnabled ? Number(feeSetting?.value?.rate_percent) : 0;
+  if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 10) {
+    return json(503, { error: "The Paystack fee configuration is invalid. Contact the administrator." });
+  }
+
   const callback = new URL(base.origin);
   callback.searchParams.set("payment", "complete");
   callback.searchParams.set("reference", order.payment_reference);
-  const amount = Math.round(Number(order.price) * 100);
-  if (!Number.isSafeInteger(amount) || amount < 100) return json(400, { error: "Bundle price is invalid for checkout." });
+  const baseCents = Math.round(Number(order.price) * 100);
+  const feeCents = Math.round(baseCents * ratePercent / 100);
+  const chargeCents = baseCents + feeCents;
+  if (!Number.isSafeInteger(chargeCents) || baseCents < 100 || chargeCents > 1000000) {
+    return json(400, { error: "Bundle price plus Paystack fee is outside the supported checkout limit." });
+  }
+  const feeAmount = feeCents / 100;
+  const chargeAmount = chargeCents / 100;
+  const { error: prepareError } = await service.rpc("prepare_paystack_order_charge", {
+    p_order_id: order.id, p_fee_amount: feeAmount, p_charge_amount: chargeAmount,
+  });
+  if (prepareError) return json(409, { error: "The order fee quote changed or checkout is no longer pending. Start again." });
 
   try {
     const response = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
       headers: { Authorization: `Bearer ${paystackSecret}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ email: authData.user.email, amount, currency: "GHS", reference: order.payment_reference,
-        callback_url: callback.toString(), metadata: { order_id: order.id, delivery_reference: deliveryReference } }),
+      body: JSON.stringify({ email: authData.user.email, amount: chargeCents, currency: "GHS", reference: order.payment_reference,
+        callback_url: callback.toString(), metadata: { order_id: order.id, delivery_reference: deliveryReference,
+          bundle_amount: Number(order.price), fee_amount: feeAmount, charge_amount: chargeAmount } }),
       signal: AbortSignal.timeout(20000),
     });
     const result = await response.json().catch(() => null);
@@ -82,10 +102,11 @@ Deno.serve(async (request: Request) => {
       return json(502, { error: "Paystack could not start checkout. No payment was taken." });
     }
     const { error: saveError } = await service.rpc("save_live_checkout_url", {
-      p_order_id: order.id, p_url: result.data.authorization_url,
+      p_order_id: order.id, p_url: result.data.authorization_url, p_fee_amount: feeAmount, p_charge_amount: chargeAmount,
     });
     if (saveError) return json(502, { error: "Checkout started but could not be saved. Contact support before retrying." });
-    return json(200, { authorization_url: result.data.authorization_url, reference: order.payment_reference });
+    return json(200, { authorization_url: result.data.authorization_url, reference: order.payment_reference,
+      bundle_amount: Number(order.price), fee_amount: feeAmount, charge_amount: chargeAmount });
   } catch {
     return json(502, { error: "Could not reach Paystack. No payment was taken." });
   }

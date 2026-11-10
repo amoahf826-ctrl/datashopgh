@@ -82,7 +82,7 @@ Deno.serve(async (request: Request) => {
   }
 
   const { data: existing, error: orderError } = await service.from("orders")
-    .select("id,payment_reference,price,payment_status,delivery_status")
+    .select("id,payment_reference,price,fee_amount,charge_amount,payment_status,delivery_status")
     .eq("payment_reference", reference).maybeSingle();
   if (orderError) return response(500, { error: "Could not load the order." });
   if (!existing) return response(200, { received: true });
@@ -115,7 +115,7 @@ Deno.serve(async (request: Request) => {
     verification = await verified.json().catch(() => null);
     if (!verified.ok || verification?.status !== true || verification?.data?.status !== "success" ||
         verification.data.reference !== reference || verification.data.currency !== "GHS" ||
-        Number(verification.data.amount) !== Math.round(Number(existing.price) * 100)) {
+        Number(verification.data.amount) !== Math.round(Number(existing.charge_amount ?? existing.price) * 100)) {
       return response(200, { received: true, verified: false });
     }
   } catch {
