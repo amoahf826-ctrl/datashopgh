@@ -10,4 +10,7 @@ verify_jwt = false
 [functions.public-track-order]
 verify_jwt = false
 
+[functions.paystack-checkout]
+verify_jwt = false
+
 
