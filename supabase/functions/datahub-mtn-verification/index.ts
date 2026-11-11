@@ -39,7 +39,7 @@ Deno.serve(async (request: Request) => {
   if (authError || !authData.user) return json(401, { error: "Your session is invalid or expired." });
   const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let body: { numbers?: unknown; networkKey?: unknown };
+  let body: { numbers?: unknown; networkKey?: unknown; purpose?: unknown };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }
   const networkKey = body.networkKey === "mtn_xpress" ? "mtn_xpress" : body.networkKey === "YELLO" || body.networkKey == null ? "YELLO" : null;
   if (!networkKey) return json(400, { error: "Choose a supported MTN network." });
@@ -48,11 +48,13 @@ Deno.serve(async (request: Request) => {
     return json(400, { error: "Submit 1 to 30 valid 10-digit Ghanaian phone numbers per check." });
   }
   const numbers = [...new Set(body.numbers as string[])];
-  const { data: submissions, error: submissionsError } = await service.from("number_verification_submissions")
-    .select("phone_number").eq("user_id", authData.user.id).in("phone_number", numbers);
-  if (submissionsError) return json(503, { error: "Could not verify these submitted numbers." });
-  const ownedNumbers = new Set((submissions ?? []).map((row) => row.phone_number));
-  if (numbers.some((number) => !ownedNumbers.has(number))) return json(403, { error: "Submit these numbers through your account before checking them." });
+  if (body.purpose !== "bulk_order_preview") {
+    const { data: submissions, error: submissionsError } = await service.from("number_verification_submissions")
+      .select("phone_number").eq("user_id", authData.user.id).in("phone_number", numbers);
+    if (submissionsError) return json(503, { error: "Could not verify these submitted numbers." });
+    const ownedNumbers = new Set((submissions ?? []).map((row) => row.phone_number));
+    if (numbers.some((number) => !ownedNumbers.has(number))) return json(403, { error: "Submit these numbers through your account before checking them." });
+  }
 
   const results: Result[] = new Array(numbers.length);
   let next = 0;

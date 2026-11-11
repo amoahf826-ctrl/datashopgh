@@ -51,18 +51,20 @@ Deno.serve(async (request: Request) => {
     return json(503, { error: "Hubnet API base must use the verified console.hubnet.app HTTPS origin." });
   }
 
-  let body: { numbers?: unknown };
+  let body: { numbers?: unknown; purpose?: unknown };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }
   if (!Array.isArray(body.numbers) || body.numbers.length < 1 || body.numbers.length > 30 ||
       body.numbers.some((number) => typeof number !== "string" || !/^0\d{9}$/.test(number))) {
     return json(400, { error: "Submit 1 to 30 valid 10-digit Ghanaian MTN numbers per check." });
   }
   const numbers = [...new Set(body.numbers as string[])];
-  const { data: submissions, error: submissionsError } = await service.from("number_verification_submissions")
-    .select("phone_number").eq("user_id", authData.user.id).in("phone_number", numbers);
-  if (submissionsError) return json(503, { error: "Could not verify these submitted numbers." });
-  const ownedNumbers = new Set((submissions ?? []).map((row) => row.phone_number));
-  if (numbers.some((number) => !ownedNumbers.has(number))) return json(403, { error: "Submit these numbers through your account before checking them." });
+  if (body.purpose !== "bulk_order_preview") {
+    const { data: submissions, error: submissionsError } = await service.from("number_verification_submissions")
+      .select("phone_number").eq("user_id", authData.user.id).in("phone_number", numbers);
+    if (submissionsError) return json(503, { error: "Could not verify these submitted numbers." });
+    const ownedNumbers = new Set((submissions ?? []).map((row) => row.phone_number));
+    if (numbers.some((number) => !ownedNumbers.has(number))) return json(403, { error: "Submit these numbers through your account before checking them." });
+  }
 
   const tokenHeader = /^Bearer\s+/i.test(hubnetToken) ? hubnetToken : `Bearer ${hubnetToken}`;
   const results: Result[] = new Array(numbers.length);
