@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import * as XLSX from 'xlsx';
 import { ArrowRight, Check, Download, ShieldCheck, Upload } from 'lucide-react';
 
 type Network='MTN'|'Telecel'|'AT';
@@ -14,7 +13,7 @@ function parseRows(value:string,bundles:Bundle[]):Row[]{
  const lines=value.split(/\r?\n/).map((text,index)=>({text:text.trim(),line:index+1})).filter(item=>item.text&&!(/phone/i.test(item.text)&&/(?:bundle|size)/i.test(item.text)));
  return lines.map(({text,line})=>{const parts=text.replace(/\s*,\s*/g,' ').trim().split(/[\s;]+/).filter(Boolean);if(parts.length<2)return{line,phone:'',error:'Use phone number and bundle size.'};const phone=normalizePhone(parts[0]);if(!/^0\d{9}$/.test(phone))return{line,phone,error:'Enter a valid Ghana phone number.'};const size=normalizeSize(parts.slice(1).join(''));if(!size)return{line,phone,error:'Bundle size is not valid.'};const bundle=bundles.find(item=>normalizeSize(item.size)===size);if(!bundle)return{line,phone,error:`${size} is not available in this network category.`};return{line,phone,bundle}});
 }
-async function spreadsheetText(file:File){const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',cellText:true,cellDates:false});const sheet=workbook.Sheets[workbook.SheetNames[0]];if(!sheet)throw new Error('Missing worksheet');const rows=XLSX.utils.sheet_to_json<(string|number)[]>(sheet,{header:1,raw:false,defval:''});return rows.map(row=>row.map(value=>String(value).trim()).filter(Boolean).join(' ')).filter(Boolean).join('\n')}
+async function spreadsheetText(file:File){const XLSX=await import('xlsx');const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',cellText:true,cellDates:false});const sheet=workbook.Sheets[workbook.SheetNames[0]];if(!sheet)throw new Error('Missing worksheet');const rows=XLSX.utils.sheet_to_json<(string|number)[]>(sheet,{header:1,raw:false,defval:''});return rows.map(row=>row.map(value=>String(value).trim()).filter(Boolean).join(' ')).filter(Boolean).join('\n')}
 function responseMessage(error:unknown,data:any){if(typeof data?.error==='string')return data.error;const context=error&&typeof error==='object'&&'context'in error?error.context:null;return context instanceof Response?'The active verification API could not verify these MTN numbers. Try again.':'Could not reach the active verification API. Try again.'}
 
 export default function BulkOrdersReview({bundles,client,balance,canOrder,excelMode,onBulkOrder,historyLabel}:{bundles:Bundle[];client:SupabaseClient|null;balance:number;canOrder:boolean;excelMode:boolean;onBulkOrder:(bundle:Bundle,phones:string[])=>Promise<OrderResult>;historyLabel:string}){
