@@ -48,10 +48,37 @@ Deno.serve(async (request: Request) => {
 
   let event: any;
   try { event = JSON.parse(raw); } catch { return response(400, { error: "Invalid JSON." }); }
-  if (event?.event !== "charge.success" || typeof event?.data?.reference !== "string") return response(200, { received: true });
-
   const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const reference = event.data.reference as string;
+  const eventName = String(event?.event ?? "");
+  const reference = typeof event?.data?.reference === "string" ? event.data.reference : "";
+  if (["transfer.success", "transfer.failed", "transfer.reversed"].includes(eventName) && reference) {
+    const transfer = event.data;
+    const status = eventName === "transfer.success" ? "success" : eventName === "transfer.failed" ? "failed" : "reversed";
+    const update: Record<string, unknown> = {
+      paystack_transfer_status: status,
+      paystack_transfer_code: transfer.transfer_code ?? null,
+      paystack_error: status === "success" ? null : String(transfer.failures?.message ?? transfer.reason ?? `Paystack transfer ${status}.`).slice(0, 500),
+      updated_at: new Date().toISOString(),
+    };
+    if (status === "success") {
+      if (transfer.currency !== "GHS" || !Number.isSafeInteger(transfer.amount)) return response(400, { error: "Transfer amount or currency is invalid." });
+      const { data: cashout } = await service.from("agent_cashout_requests")
+        .select("id,amount,payout_amount,status").eq("paystack_transfer_reference", reference).maybeSingle();
+      if (!cashout || Math.round(Number(cashout.payout_amount ?? cashout.amount) * 100) !== transfer.amount) return response(200, { received: true, ignored: true });
+      Object.assign(update, { status: "paid", payout_reference: reference, processed_at: new Date().toISOString() });
+    } else {
+      if (status === "failed") {
+        const { data: current } = await service.from("agent_cashout_requests")
+          .select("paystack_transfer_status").eq("paystack_transfer_reference", reference).maybeSingle();
+        if (current?.paystack_transfer_status === "success") return response(200, { received: true, ignored: true });
+      }
+      Object.assign(update, { status: "processing" });
+    }
+    const { error } = await service.from("agent_cashout_requests").update(update).eq("paystack_transfer_reference", reference);
+    if (error) return response(500, { error: "Could not save the agent cashout transfer status." });
+    return response(200, { received: true, agentCashoutTransfer: status });
+  }
+  if (eventName !== "charge.success" || !reference) return response(200, { received: true });
 
   const { data: deposit, error: depositError } = await service.from("deposits")
     .select("id,amount,fee_amount,charge_amount,status").eq("provider", "paystack").eq("provider_reference", reference).maybeSingle();

@@ -16,4 +16,7 @@ verify_jwt = false
 [functions.paystack-order-reconcile]
 verify_jwt = false
 
+[functions.admin-paystack-agent-cashout]
+verify_jwt = false
+
 
