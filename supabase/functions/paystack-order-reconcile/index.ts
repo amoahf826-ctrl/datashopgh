@@ -70,9 +70,11 @@ Deno.serve(async (request: Request) => {
     });
     const result = await verified.json().catch(() => null);
     const transaction = result?.data;
+    const requestedAmount = transaction?.requested_amount;
     if (!verified.ok || result?.status !== true || transaction?.status !== "success" ||
         transaction?.reference !== reference || transaction?.currency !== "GHS" ||
-        Number(transaction?.amount) !== Math.round(Number(order.charge_amount ?? order.price) * 100)) {
+        !Number.isSafeInteger(transaction?.amount) || !Number.isSafeInteger(requestedAmount) ||
+        transaction.amount < requestedAmount || requestedAmount !== Math.round(Number(order.charge_amount ?? order.price) * 100)) {
       return json(200, { success: false, pending: true, message: "Paystack has not confirmed this payment yet. Your order will update when confirmation arrives." });
     }
 

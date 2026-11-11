@@ -66,13 +66,15 @@ Deno.serve(async (request: Request) => {
       });
       const result = await verified.json().catch(() => null);
       const transaction = result?.data;
+      const requestedAmount = transaction?.requested_amount;
       if (!verified.ok || result?.status !== true || transaction?.status !== "success" ||
           transaction?.reference !== reference || transaction?.currency !== "GHS" ||
-          Number(transaction?.amount) !== Math.round(Number(deposit.charge_amount ?? deposit.amount) * 100)) {
+          !Number.isSafeInteger(transaction?.amount) || !Number.isSafeInteger(requestedAmount) ||
+          transaction.amount < requestedAmount || requestedAmount !== Math.round(Number(deposit.charge_amount ?? deposit.amount) * 100)) {
         return response(200, { received: true, verified: false });
       }
       const { error: claimError } = await service.rpc("claim_paystack_wallet_deposit", {
-        p_reference: reference, p_amount: Number(transaction.amount), p_currency: transaction.currency,
+        p_reference: reference, p_amount: requestedAmount, p_currency: transaction.currency,
       });
       if (claimError) return response(500, { error: "Verified wallet payment could not be credited." });
       return response(200, { received: true, walletDeposit: true });
@@ -107,24 +109,28 @@ Deno.serve(async (request: Request) => {
   }
 
   let verification: any;
+  let verifiedRequestedAmount = 0;
   try {
     const verified = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
       headers: { Authorization: `Bearer ${secret}`, Accept: "application/json" },
       signal: AbortSignal.timeout(10000),
     });
     verification = await verified.json().catch(() => null);
+    const requestedAmount = verification?.data?.requested_amount;
     if (!verified.ok || verification?.status !== true || verification?.data?.status !== "success" ||
         verification.data.reference !== reference || verification.data.currency !== "GHS" ||
-        Number(verification.data.amount) !== Math.round(Number(existing.charge_amount ?? existing.price) * 100)) {
+        !Number.isSafeInteger(verification.data.amount) || !Number.isSafeInteger(requestedAmount) ||
+        verification.data.amount < requestedAmount || requestedAmount !== Math.round(Number(existing.charge_amount ?? existing.price) * 100)) {
       return response(200, { received: true, verified: false });
     }
+    verifiedRequestedAmount = requestedAmount;
   } catch {
     return response(500, { error: "Could not verify payment; Paystack may retry this webhook." });
   }
 
   const { data: claim, error: claimError } = await service.rpc("claim_paid_order", {
     p_reference: reference,
-    p_amount: Number(verification.data.amount),
+    p_amount: verifiedRequestedAmount,
     p_currency: verification.data.currency,
   });
   if (claimError) return response(500, { error: "Verified payment could not be reconciled." });

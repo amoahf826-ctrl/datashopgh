@@ -61,13 +61,15 @@ Deno.serve(async (request: Request) => {
     });
     const result = await response.json().catch(() => null);
     const transaction = result?.data;
+    const requestedAmount = transaction?.requested_amount;
     if (!response.ok || result?.status !== true || transaction?.status !== "success" ||
         transaction?.reference !== body.reference || transaction?.currency !== "GHS" ||
-        !Number.isSafeInteger(transaction?.amount) || transaction.amount !== Math.round(Number(deposit.charge_amount ?? deposit.amount) * 100)) {
+        !Number.isSafeInteger(transaction?.amount) || !Number.isSafeInteger(requestedAmount) ||
+        transaction.amount < requestedAmount || requestedAmount !== Math.round(Number(deposit.charge_amount ?? deposit.amount) * 100)) {
       return json(200, { success: false, message: "Paystack has not confirmed this wallet payment yet." });
     }
     const { data: claim, error: claimError } = await service.rpc("claim_paystack_wallet_deposit", {
-      p_reference: body.reference, p_amount: transaction.amount, p_currency: transaction.currency,
+      p_reference: body.reference, p_amount: requestedAmount, p_currency: transaction.currency,
     });
     if (claimError || !claim) return json(500, { error: "Verified wallet payment could not be credited. Contact support with your reference." });
     return json(200, { success: true, credited: claim.credited, balance: Number(claim.balance ?? 0),
