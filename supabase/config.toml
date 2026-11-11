@@ -13,4 +13,7 @@ verify_jwt = false
 [functions.paystack-checkout]
 verify_jwt = false
 
+[functions.paystack-order-reconcile]
+verify_jwt = false
+
 
