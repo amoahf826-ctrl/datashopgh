@@ -71,6 +71,15 @@ export function DebtorsAdmin({client}:{client:SupabaseClient}){
 
 function ghanaDayBounds(daysAgo=0){const now=new Date();const todayStart=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());const start=new Date(todayStart-daysAgo*86400000);return{start,end:new Date(start.getTime()+86400000)}}
 
+async function smsFunctionErrorMessage(error:unknown){
+ const context=(error as {context?:unknown}|null)?.context;
+ if(context instanceof Response){
+  try{const payload=await context.clone().json() as {error?:unknown;message?:unknown};const detail=payload.error??payload.message;if(typeof detail==='string'&&detail.trim())return `${detail} (HTTP ${context.status})`}catch{}
+  return `SMS status check failed (HTTP ${context.status}). Check the Edge Function logs.`
+ }
+ return error instanceof Error?error.message:'SMS provider configuration could not be checked.'
+}
+
 export function BulkSmsAdmin({client,notify}:{client:SupabaseClient;notify:(message:string)=>void}){
  const [audience,setAudience]=useState('all_agents'),[message,setMessage]=useState(''),[customNumbers,setCustomNumbers]=useState(''),[scheduledFor,setScheduledFor]=useState(''),[senderId,setSenderId]=useState(''),[profiles,setProfiles]=useState<Row[]>([]),[agents,setAgents]=useState<Row[]>([]),[wallets,setWallets]=useState<Row[]>([]),[logs,setLogs]=useState<Row[]>([]),[buyerOrders,setBuyerOrders]=useState<Row[]|null>(null),[providerConfigured,setProviderConfigured]=useState<boolean|null>(null),[providerStatus,setProviderStatus]=useState('Checking SMS provider configuration…'),[saving,setSaving]=useState(false),[sending,setSending]=useState(false);
  async function load(){
@@ -82,7 +91,7 @@ export function BulkSmsAdmin({client,notify}:{client:SupabaseClient;notify:(mess
   setBuyerOrders(purchaseError?null:purchases);
   if(purchaseError)notify('Could not load paid customer orders for the date-based SMS audiences. Check administrator order access.');
   const {data:statusData,error:statusError}=await client.functions.invoke('smsnotifygh-bulk-sms',{body:{operation:'status'}});
-  if(statusError||!statusData?.success){setProviderConfigured(false);setProviderStatus(statusData?.error??statusError?.message??'SMS provider configuration could not be checked. Deploy the updated SMS function.')}
+  if(statusError||!statusData?.success){setProviderConfigured(false);setProviderStatus(statusData?.error??(statusError?await smsFunctionErrorMessage(statusError):'SMS provider configuration could not be checked.'))}
   else{setProviderConfigured(Boolean(statusData.configured));setProviderStatus(String(statusData.message??'SMS provider configuration checked.'))}
  }
  useEffect(()=>{void load()},[client]);

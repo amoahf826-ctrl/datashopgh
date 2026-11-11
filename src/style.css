@@ -423,27 +423,6 @@
 @media(max-width:540px){.brand-logo{width:36px;height:36px}.dashboard-brand-logo{width:38px;height:38px}.dashboard-title{gap:9px}.dashboard-title h1{font-size:23px}}
 .hubnet-number-status{display:inline-flex;align-items:center;justify-self:start;padding:5px 9px;border-radius:999px;background:#f1f3f6;color:#596579;font-size:10px;font-weight:800;text-transform:capitalize}.hubnet-verified,.hubnet-submitted{background:#e4f8ed;color:#138146}.hubnet-unverified,.hubnet-invalid{background:#fff0ee;color:#b42318}.hubnet-queued{background:#fff5dc;color:#9a6100}.agent-order-heading>h3{margin:17px 0 7px;font:750 14px Manrope,sans-serif}
 
-/* Agent referral stores use the same public storefront palette as the main shop. */
-.storefront.agent-storefront-theme,.storefront.agent-storefront-theme .shop-content{background:#fff!important;color:#202938!important}
-.storefront.agent-storefront-theme .shop-header{background:#fff!important;border-color:#e8eaf0!important}
-.storefront.agent-storefront-theme .shop-brand b{color:#111827!important}
-.storefront.agent-storefront-theme .shop-brand small{color:#667085!important}
-.storefront.agent-storefront-theme .shop-icon-button{background:#fff!important;border-color:#e2e5eb!important;color:#273244!important}
-.storefront.agent-storefront-theme .shop-section-heading h2{color:#172033!important}
-.storefront.agent-storefront-theme .shop-section-heading p{color:#667085!important}
-.storefront.agent-storefront-theme .network-category,.storefront.agent-storefront-theme .network-category.bigtime-folder,.storefront.agent-storefront-theme .network-category.afa-folder,.storefront.agent-storefront-theme .network-category.info-folder{background:#050505!important;border-color:#292929!important;box-shadow:0 8px 22px #1820330b!important}
-.storefront.agent-storefront-theme .category-details h3{color:#fff!important}
-.storefront.agent-storefront-theme .category-details p{color:#e0e0e0!important}
-.storefront.agent-storefront-theme .folder-open-hint{background:#080808!important;border-color:#fff!important;color:#fff!important}
-.storefront.agent-storefront-theme .shop-bottom-nav{background:#fffffff2!important;border-color:#e5e7eb!important}
-.storefront.agent-storefront-theme .shop-bottom-nav button,.storefront.agent-storefront-theme .shop-bottom-nav>a{background:#fff!important;border-color:#e5e7eb!important;color:#344054!important}
-.storefront.agent-storefront-theme .store-drawer{background:#fff!important;color:#202938!important}
-.storefront.agent-storefront-theme .drawer-brand-card{background:#fff!important;border-color:#e5e7eb!important}
-.storefront.agent-storefront-theme .drawer-brand-card b{color:#172033!important}
-.storefront.agent-storefront-theme .drawer-links>button,.storefront.agent-storefront-theme .drawer-links>a{color:#344054!important}
-.storefront.agent-storefront-theme .shop-footer{background:#fff!important;color:#667085!important}
-.storefront.agent-storefront-theme .shop-footer strong,.storefront.agent-storefront-theme .shop-footer span{color:#4c1d95!important}
-
 /* Admin workspace reference layout: compact dark navigation and provider cards. */
 .admin-layout{background:#f0f1f3;color:#101827}
 .admin-sidebar{width:236px;flex-basis:236px;padding:16px 14px 14px;background:#07111f;color:#e9eef7}
