@@ -10,7 +10,7 @@ import afaImage from './assets/afa.jpeg';
 import tigoBigTimeLogo from './assets/tigo-bigtime.png';
 import infoCodesFolderLogo from './assets/info-codes-folder.png';
 import cheapDataBundleLogo from './assets/cheapdatabundle-logo.jpg';
-import { ArrowLeft, ArrowRight, BookOpen, ChevronRight, Clock3, Download, FileSpreadsheet, FolderOpen, Home, Info, Menu, Phone, Radio, Search, Share2, UserPlus, Users, Upload, X, Zap, ClipboardList, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ChevronRight, Clock3, Download, FileSpreadsheet, FolderOpen, Home, Info, Menu, Phone, Radio, Search, Share2, UserPlus, Users, X, Zap, ClipboardList, Send } from 'lucide-react';
 
 type Network='MTN'|'Telecel'|'AT'; export type Bundle={id:string;network:Network;size:string;price:number;validity:string;category?:string;subcategory?:string;popular?:boolean};
 const networkNames:Record<Network,string>={MTN:'MTN DATA',Telecel:'TELECEL DATA',AT:'AIRTELTIGO iSHARE (INSTANT)'};
@@ -95,6 +95,5 @@ export function AgentBuyDataPanel({bundles,balance,orders,loading,onBack,showBac
   <div className="agent-buy-modes" role="tablist" aria-label="Order mode"><button className={mode==='single'?'active':''} onClick={()=>setMode('single')}><UserPlus size={16}/> Single Order</button><button className={mode==='bulk'?'active':''} onClick={()=>setMode('bulk')}><Users size={16}/> Bulk Orders</button><button className={mode==='excel'?'active':''} onClick={()=>setMode('excel')}><FileSpreadsheet size={16}/> Excel Upload</button></div>
   <nav className="agent-network-tabs" aria-label="Bundle category">{tabs.map(([id,label,color])=><button key={id} className={`network-tab-${color} ${category===id?'active':''}`} onClick={()=>{setCategory(id);}}>{label}</button>)}</nav>
   {mode!=='single'&&<BulkOrdersReview bundles={categoryBundles} client={client} balance={balance} canOrder={canOrder} excelMode={mode==='excel'} onBulkOrder={onBulkOrder} historyLabel={customerMode?'order history':'Transaction History'}/>} {loading?<div className="agent-buy-empty">Loading available bundles…</div>:categoryBundles.length?<div className="agent-package-grid">{categoryBundles.map(bundle=><article className={`agent-package-card ${bundle.network.toLowerCase()}`} key={bundle.id}><div className="agent-package-meta"><b>{bundle.network==='AT'?(/big[\s-]?time/i.test(`${bundle.category??''} ${bundle.subcategory??''} ${bundle.size}`)?'AT BIG TIME':'AT iSHARE (INSTANT)'):bundle.network.toUpperCase()}</b></div><h2>{bundle.size.replace(/\s/g,'')}</h2><p>Data Bundle</p><strong>{currency(bundle.price)}</strong><button onClick={()=>onChoose(bundle)} disabled={mode!=='single'}>{mode==='single'?'Buy Now':'Enter size above'}</button></article>)}</div>:<div className="agent-buy-empty">No bundles are available in this category right now.</div>}
-  {message&&mode==='single'&&<p className="agent-buy-message" role="status">{message}</p>}
  </section>
 }
