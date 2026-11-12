@@ -42,7 +42,14 @@ Deno.serve(async request => {
       const { data: agent } = await service.from("agent_accounts").select("user_id").eq("user_id", signedInUser.id).eq("is_active", true).maybeSingle();
       if (agent) {
         agentPrices = pricing.agent_prices;
-        const { data: overrides } = await service.from("agent_result_checker_prices").select("voucher_type,customer_price").eq("agent_id", signedInUser.id);
+        const { data: overrides, error: overrideError } = await service.from("agent_result_checker_prices").select("voucher_type,customer_price").eq("agent_id", signedInUser.id);
+        if (overrideError) {
+          console.error("Could not read agent result checker prices.", overrideError.code ?? "unknown");
+          if (overrideError.code === "42P01" || overrideError.code === "PGRST205") {
+            return json(503, { error: "Agent checker price storage is missing. Apply migration 202611120003_agent_result_checker_prices.sql, then retry." });
+          }
+          return json(503, { error: `Could not load your result checker storefront prices (${overrideError.code ?? "database error"}).` });
+        }
         storePrices = { ...pricing.prices };
         for (const row of overrides ?? []) if (row.voucher_type === "BECE" || row.voucher_type === "WASSCE") storePrices[row.voucher_type] = Number(row.customer_price);
       }
@@ -52,7 +59,14 @@ Deno.serve(async request => {
     if (referralCode) {
       const { data: referredAgent } = await service.from("agent_accounts").select("user_id").eq("referral_code", referralCode).eq("is_active", true).maybeSingle();
       if (!referredAgent) return json(400, { error: "This agent store link is no longer active." });
-      const { data: overrides } = await service.from("agent_result_checker_prices").select("voucher_type,customer_price").eq("agent_id", referredAgent.user_id);
+      const { data: overrides, error: overrideError } = await service.from("agent_result_checker_prices").select("voucher_type,customer_price").eq("agent_id", referredAgent.user_id);
+      if (overrideError) {
+        console.error("Could not read referred agent result checker prices.", overrideError.code ?? "unknown");
+        if (overrideError.code === "42P01" || overrideError.code === "PGRST205") {
+          return json(503, { error: "Agent checker price storage is missing. Apply migration 202611120003_agent_result_checker_prices.sql, then retry." });
+        }
+        return json(503, { error: `Could not load this agent's result checker prices (${overrideError.code ?? "database error"}).` });
+      }
       storefrontPrices = { ...pricing.prices };
       for (const row of overrides ?? []) if (row.voucher_type === "BECE" || row.voucher_type === "WASSCE") storefrontPrices[row.voucher_type] = Number(row.customer_price);
     }
