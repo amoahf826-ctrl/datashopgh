@@ -12,7 +12,7 @@ export default function NumberVerificationPanel({client,userId,isAgent=false,exp
  useEffect(()=>{void load()},[load]);
  async function check(numbers:string[],submitForApproval=false){
   if(!client)return false;
-  const {data:providerSetting,error:settingError}=await client.from('platform_settings').select('value').eq('key','active_bundle_provider').maybeSingle();
+  const {data:providerSetting,error:settingError}=await client.from('platform_settings').select('value').eq('key','number_verification_provider').maybeSingle();
   if(settingError){setNotice('Number verification is temporarily unavailable. Please try again.');return false}
   const activeProvider=providerSetting?.value?.provider==='hubnet'?'hubnet':'datahub';
   const functionName=activeProvider==='datahub'?'datahub-mtn-verification':'hubnet-mtn-verification';
