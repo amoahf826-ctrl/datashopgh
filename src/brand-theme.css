@@ -27,7 +27,7 @@ body { color: var(--brand-ink); background: var(--brand-paper); }
 .brand-launch span { font: 750 13px Manrope,sans-serif; letter-spacing: .08em; color: #fff4c7; }
 .brand-launch i { width: 100px; height: 3px; overflow: hidden; border-radius: 4px; background: #ffffff24; }
 .brand-launch i::after { display: block; width: 45%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#d99b00,#ffe276); content: ''; animation: brand-launch-progress 1.1s ease-in-out infinite; }
-.brand-launch-overlay { animation: brand-launch-fade 1.5s ease-in forwards; }
+.brand-launch-overlay { animation: brand-launch-fade .7s ease-in forwards; }
 @keyframes brand-launch-appear { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
 @keyframes brand-launch-progress { from { transform: translateX(-110%); } to { transform: translateX(240%); } }
 @keyframes brand-launch-fade { 0%,84% { opacity: 1; visibility: visible; } 100% { opacity: 0; visibility: hidden; pointer-events: none; } }

@@ -1,0 +1,89 @@
+/* Final design tokens and consistency fixes applied after the legacy themes. */
+:root {
+  --type-caption: 0.75rem;
+  --type-small: 0.875rem;
+  --type-body: 1rem;
+  --type-section: 1.25rem;
+  --type-title: clamp(1.75rem, 3.5vw, 2.5rem);
+  --surface-line: #e3e7ed;
+  --surface-shadow: 0 12px 30px rgb(18 32 49 / 7%);
+}
+
+html { font-size: 100%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { min-width: 320px; font-size: var(--type-body); line-height: 1.5; }
+button, input, select, textarea { font-family: inherit; }
+button { touch-action: manipulation; }
+img, svg { max-width: 100%; }
+
+:is(.hero h1, .inner-head h1, .dashboard-title h1, .agent-main-head h1,
+  .admin-heading h1, .track-intro h1, .result-checker-heading h1) {
+  font-size: var(--type-title);
+  line-height: 1.14;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+:is(.shop-section-heading h2, .agent-tool-panel h2, .agent-order-panel h2,
+  .admin-card h2, .track-results-heading h2, .result-checker-history h2) {
+  font-size: clamp(1.125rem, 2.4vw, 1.375rem);
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+:is(.hero-sub, .dashboard-title p, .agent-main-head p, .shop-section-heading p,
+  .result-checker-heading p, .track-intro p) {
+  font-size: var(--type-small);
+  line-height: 1.6;
+}
+
+.customer-storefront .shop-brand b { font-size: 1rem; }
+.customer-storefront .shop-brand small,
+.customer-storefront .category-details p,
+.customer-storefront .track-prompt small,
+.customer-storefront .shop-bottom-nav button,
+.customer-storefront .shop-bottom-nav > a { font-size: var(--type-caption); line-height: 1.35; }
+.customer-storefront .category-details h3 { font-size: 1rem; line-height: 1.35; }
+.customer-storefront .category-pill { font-size: var(--type-caption); }
+.shop-icon-button { min-width: 44px; min-height: 44px; }
+
+.admin-layout { font-size: var(--type-small); line-height: 1.5; }
+.admin-heading h1 { font-size: clamp(1.5rem, 2.5vw, 2rem); }
+.admin-heading p, .admin-card-heading p { font-size: var(--type-caption); line-height: 1.55; }
+.admin-card h2, .api-providers-heading h2 { font-size: 1.25rem; }
+.admin-table-wrap th { font-size: var(--type-caption); line-height: 1.4; }
+.admin-table-wrap td { font-size: var(--type-small); line-height: 1.5; }
+.admin-record-row b { font-size: var(--type-small); }
+.admin-record-row small { font-size: var(--type-caption); line-height: 1.45; }
+.admin-action, .ops-primary, .ops-secondary { min-height: 40px; font-size: var(--type-caption); }
+.admin-layout input, .admin-layout select, .admin-layout textarea { font-size: var(--type-small); }
+
+.agent-dashboard-active { font-size: var(--type-small); line-height: 1.5; }
+.agent-main-head h1 { font-size: clamp(1.625rem, 3vw, 2.125rem); }
+.agent-sidebar nav button { min-height: 46px; font-size: var(--type-small); }
+.agent-tool-panel p, .agent-order-panel p { line-height: 1.55; }
+.agent-field, .agent-tool-panel label, .agent-order-panel label { font-size: var(--type-caption); line-height: 1.45; }
+.agent-field input, .agent-field select, .agent-field textarea { min-height: 44px; font-size: var(--type-small); }
+.agent-dashboard-active :is(.agent-field small, .agent-tool-panel small, .agent-order-panel small) { font-size: var(--type-caption); line-height: 1.45; }
+
+.track-form label, .result-checker-form label { font-size: var(--type-caption); line-height: 1.45; }
+.track-form input, .track-form select, .result-checker-form input, .result-checker-form select { min-height: 48px; font-size: var(--type-small); }
+.track-hint, .track-error, .tracked-order-main small, .track-no-results { font-size: var(--type-caption); line-height: 1.5; }
+.result-checker-panel { line-height: 1.5; }
+.result-checker-message { font-size: var(--type-small); line-height: 1.5; }
+
+:where(input, select, textarea, button, a):focus-visible {
+  outline: 3px solid #316be8;
+  outline-offset: 3px;
+}
+
+@media (max-width: 680px) {
+  :root { --type-title: clamp(1.5rem, 7vw, 2rem); }
+  .customer-storefront .category-details p { font-size: 0.75rem; }
+  .admin-content { padding-inline: 14px; }
+  .admin-card { padding: 18px 16px; }
+  .admin-table-wrap { -webkit-overflow-scrolling: touch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

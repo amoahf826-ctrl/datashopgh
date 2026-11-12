@@ -4,6 +4,7 @@ import App from './App';
 import './style.css';
 import './responsive.css';
 import './brand-theme.css';
+import './polish.css';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
