@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { purchaseDataHubVouchers } from "../_shared/datahub-vouchers.ts";
+import { dataHubNetworkKey, hubnetPath, resolveBundleRoute } from "../_shared/bundle-routing.ts";
 
 const response = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -168,7 +169,7 @@ Deno.serve(async (request: Request) => {
   }
 
   const { data: existing, error: orderError } = await service.from("orders")
-    .select("id,payment_reference,price,fee_amount,charge_amount,payment_status,delivery_status")
+    .select("id,bundle_id,payment_reference,price,fee_amount,charge_amount,payment_status,delivery_status")
     .eq("payment_reference", reference).maybeSingle();
   if (orderError) return response(500, { error: "Could not load the order." });
   if (!existing) return response(200, { received: true });
@@ -176,21 +177,30 @@ Deno.serve(async (request: Request) => {
   const { data: providerSetting, error: providerSettingError } = await service.from("platform_settings")
     .select("value").eq("key", "active_bundle_provider").maybeSingle();
   if (providerSettingError) return response(503, { error: "Could not read the active bundle provider; Paystack may retry this webhook." });
-  const activeProvider = providerSetting?.value?.provider === "hubnet" ? "hubnet" : "datahub";
+  const fallbackProvider = providerSetting?.value?.provider === "hubnet" ? "hubnet" : "datahub";
+  const enabledProviders = { datahub: providerSetting?.value?.enabled?.datahub !== false, hubnet: providerSetting?.value?.enabled?.hubnet !== false };
   const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
   const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://console.hubnet.app").replace(/\/+$/, "");
+  const { data: plan } = await service.from("bundles").select("network,category,subcategory,delivery_provider,delivery_network_type").eq("id", existing.bundle_id).maybeSingle();
+  if (!plan) return response(503, { error: "Could not load the selected bundle routing; Paystack may retry this webhook." });
+  const route = resolveBundleRoute(plan, fallbackProvider);
+  const activeProvider = route.provider;
+  if (!enabledProviders[activeProvider]) return response(503, { error: `${activeProvider === "hubnet" ? "Hubnet" : "DataHub GH"} is disabled; enable it so Paystack can retry delivery.` });
   if (activeProvider === "datahub" && !datahubKey) return response(503, { error: "DataHub delivery is not configured; Paystack may retry this webhook." });
+  if (activeProvider === "hubnet" && !hubnetToken) return response(503, { error: "Hubnet delivery is not configured; Paystack may retry this webhook." });
+  if (activeProvider === "hubnet") {
+    try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "console.hubnet.app" || base.username || base.password) throw new Error(); }
+    catch { return response(503, { error: "HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin." }); }
+  }
+  let networkKey: string;
+  try { networkKey = activeProvider === "datahub" ? dataHubNetworkKey(route.networkType) : hubnetPath(route.networkType); }
+  catch (error) { return response(503, { error: error instanceof Error ? error.message : "Invalid provider network mapping." }); }
   let appOrigin: string;
   try {
     const base = new URL(appBase);
     if (base.protocol !== "https:" || base.pathname !== "/" || base.username || base.password || base.search || base.hash) throw new Error();
     appOrigin = base.origin;
   } catch { return response(503, { error: "APP_BASE_URL must be a secure site origin." }); }
-  if (activeProvider === "hubnet" && !hubnetToken) return response(503, { error: "Hubnet delivery is not configured; Paystack may retry this webhook." });
-  if (activeProvider === "hubnet") {
-    try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "console.hubnet.app" || base.username || base.password) throw new Error(); }
-    catch { return response(503, { error: "HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin." }); }
-  }
 
   let verification: any;
   let verifiedRequestedAmount = 0;
@@ -220,16 +230,6 @@ Deno.serve(async (request: Request) => {
   if (claimError) return response(500, { error: "Verified payment could not be reconciled." });
   if (!claim?.newly_paid) return response(200, { received: true, duplicate: true });
   await service.from("orders").update({ delivery_provider: activeProvider }).eq("id", claim.order_id);
-
-  const { data: orderRecord } = await service.from("orders").select("bundle_id").eq("id", claim.order_id).maybeSingle();
-  const { data: plan } = orderRecord?.bundle_id
-    ? await service.from("bundles").select("category,subcategory").eq("id", orderRecord.bundle_id).maybeSingle()
-    : { data: null };
-  const category = `${plan?.category ?? ""} ${plan?.subcategory ?? ""}`.toLowerCase();
-  const networkKey = String(claim.network) === "MTN"
-    ? "YELLO"
-    : String(claim.network) === "Telecel" ? "TELECEL"
-    : String(claim.network) === "AT" ? (/big[\s-]?time/.test(category) ? "AT_BIGTIME" : "AT_PREMIUM") : null;
   const size = String(claim.size ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i);
   if (!networkKey || !size) {
     await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "failed" });
@@ -247,12 +247,8 @@ Deno.serve(async (request: Request) => {
         signal: AbortSignal.timeout(15000),
       });
     } else {
-      const hubnetPath = networkKey === "AT_BIGTIME" ? "big-time-new-transaction"
-        : networkKey === "TELECEL" ? "telecel-new-transaction"
-        : networkKey === "AT_PREMIUM" ? "at-new-transaction"
-        : "mtn-new-transaction";
       const volume = String(Math.round(Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1000 : 1)));
-      const endpoint = `${hubnetBase}/live/api/context/business/transaction/${hubnetPath}`;
+      const endpoint = `${hubnetBase}/live/api/context/business/transaction/${networkKey}`;
       const authHeader = /^Bearer\s+/i.test(hubnetToken!) ? hubnetToken! : `Bearer ${hubnetToken}`;
       delivery = await fetch(endpoint, {
         method: "POST",

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { dataHubNetworkKey, hubnetPath, resolveBundleRoute } from "../_shared/bundle-routing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,9 +63,18 @@ Deno.serve(async (request: Request) => {
   const { data: providerSetting, error: providerSettingError } = await service.from("platform_settings")
     .select("value").eq("key", "active_bundle_provider").maybeSingle();
   if (providerSettingError) return json(503, { error: "Could not read the active bundle provider." });
-  const activeProvider = providerSetting?.value?.provider === "hubnet" ? "hubnet" : "datahub";
+  const fallbackProvider = providerSetting?.value?.provider === "hubnet" ? "hubnet" : "datahub";
+  const enabledProviders = { datahub: providerSetting?.value?.enabled?.datahub !== false, hubnet: providerSetting?.value?.enabled?.hubnet !== false };
+  const { data: configuredPlan } = await service.from("bundles").select("network,category,subcategory,delivery_provider,delivery_network_type,size").eq("id", body.bundle_id).eq("is_active", true).maybeSingle();
+  if (!configuredPlan) return json(400, { error: "This data plan is unavailable." });
+  const route = resolveBundleRoute(configuredPlan, fallbackProvider);
+  const activeProvider = route.provider;
+  if (!enabledProviders[activeProvider]) return json(503, { error: `${activeProvider === "hubnet" ? "Hubnet" : "DataHub GH"} is disabled for this plan.` });
   if (activeProvider === "datahub" && !datahubKey) return json(503, { error: "DataHub wallet delivery is not configured on the server." });
   if (activeProvider === "hubnet" && !hubnetToken) return json(503, { error: "Hubnet wallet delivery is not configured on the server." });
+  let networkKey: string;
+  try { networkKey = activeProvider === "datahub" ? dataHubNetworkKey(route.networkType) : hubnetPath(route.networkType); }
+  catch (error) { return json(503, { error: error instanceof Error ? error.message : "Invalid provider network mapping." }); }
   if (activeProvider === "hubnet") {
     try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "console.hubnet.app" || base.username || base.password) throw new Error(); }
     catch { return json(503, { error: "HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin." }); }
@@ -98,17 +108,8 @@ Deno.serve(async (request: Request) => {
   if (!order.created) return json(200, { success: true, ...order, duplicate: true });
   await service.from("orders").update({ delivery_provider: activeProvider }).eq("id", order.order_id);
 
-  const { data: orderRecord } = await service.from("orders").select("bundle_id").eq("id", order.order_id).maybeSingle();
-  const { data: plan } = orderRecord?.bundle_id
-    ? await service.from("bundles").select("category,subcategory").eq("id", orderRecord.bundle_id).maybeSingle()
-    : { data: null };
-  const category = `${plan?.category ?? ""} ${plan?.subcategory ?? ""}`.toLowerCase();
-  const networkKey = String(order.network) === "MTN"
-    ? "YELLO"
-    : String(order.network) === "Telecel" ? "TELECEL"
-    : String(order.network) === "AT" ? (/big[\s-]?time/.test(category) ? "AT_BIGTIME" : "AT_PREMIUM") : null;
   const size = String(order.size ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i);
-  if (!networkKey || !size) {
+  if (!size) {
     await service.rpc("update_live_order_delivery", {
       p_reference: deliveryReference, p_delivery_status: "failed",
     });
@@ -138,13 +139,9 @@ Deno.serve(async (request: Request) => {
         signal: AbortSignal.timeout(15000),
       });
     } else {
-      const hubnetPath = networkKey === "AT_BIGTIME" ? "big-time-new-transaction"
-        : networkKey === "TELECEL" ? "telecel-new-transaction"
-        : networkKey === "AT_PREMIUM" ? "at-new-transaction"
-        : "mtn-new-transaction";
       const volume = String(Math.round(Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1000 : 1)));
       const authHeader = /^Bearer\s+/i.test(hubnetToken!) ? hubnetToken! : `Bearer ${hubnetToken}`;
-      delivery = await fetch(`${hubnetBase}/live/api/context/business/transaction/${hubnetPath}`, {
+      delivery = await fetch(`${hubnetBase}/live/api/context/business/transaction/${networkKey}`, {
         method: "POST",
         headers: { token: authHeader, "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ phone: body.recipient_phone, volume, reference: deliveryReference, webhook }),
