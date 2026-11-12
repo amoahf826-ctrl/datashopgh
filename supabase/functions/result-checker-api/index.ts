@@ -37,12 +37,46 @@ Deno.serve(async request => {
   if (body.action === "catalog") {
     const { data: feeSetting } = await service.from("platform_settings").select("value").eq("key", "paystack_fee_recovery").maybeSingle();
     let agentPrices: typeof pricing.agent_prices | undefined;
+    let storePrices: typeof pricing.prices | undefined;
     if (signedInUser) {
       const { data: agent } = await service.from("agent_accounts").select("user_id").eq("user_id", signedInUser.id).eq("is_active", true).maybeSingle();
-      if (agent) agentPrices = pricing.agent_prices;
+      if (agent) {
+        agentPrices = pricing.agent_prices;
+        const { data: overrides } = await service.from("agent_result_checker_prices").select("voucher_type,customer_price").eq("agent_id", signedInUser.id);
+        storePrices = { ...pricing.prices };
+        for (const row of overrides ?? []) if (row.voucher_type === "BECE" || row.voucher_type === "WASSCE") storePrices[row.voucher_type] = Number(row.customer_price);
+      }
     }
-    return json(200, { enabled: pricing.enabled, prices: pricing.prices, ...(agentPrices ? { agent_prices: agentPrices } : {}),
+    let storefrontPrices = pricing.prices;
+    const referralCode = typeof body.agent_referral_code === "string" ? body.agent_referral_code.trim().toUpperCase() : "";
+    if (referralCode) {
+      const { data: referredAgent } = await service.from("agent_accounts").select("user_id").eq("referral_code", referralCode).eq("is_active", true).maybeSingle();
+      if (!referredAgent) return json(400, { error: "This agent store link is no longer active." });
+      const { data: overrides } = await service.from("agent_result_checker_prices").select("voucher_type,customer_price").eq("agent_id", referredAgent.user_id);
+      storefrontPrices = { ...pricing.prices };
+      for (const row of overrides ?? []) if (row.voucher_type === "BECE" || row.voucher_type === "WASSCE") storefrontPrices[row.voucher_type] = Number(row.customer_price);
+    }
+    return json(200, { enabled: pricing.enabled, prices: storefrontPrices, ...(agentPrices ? { agent_prices: agentPrices, store_prices: storePrices } : {}),
       fee_enabled: feeSetting?.value?.enabled !== false, fee_rate: Number(feeSetting?.value?.rate_percent ?? 3), provider_configured: !!providerKey() });
+  }
+
+  if (body.action === "save_store_prices") {
+    if (!signedInUser) return json(401, { error: "Sign in to save your agent storefront prices." });
+    const { data: agent } = await service.from("agent_accounts").select("user_id").eq("user_id", signedInUser.id).eq("is_active", true).maybeSingle();
+    if (!agent) return json(403, { error: "An active agent account is required to set storefront prices." });
+    const values = body.prices;
+    if (!values || !["BECE", "WASSCE"].every(type => Number.isFinite(Number(values[type])) && Number(values[type]) > 0 && Number(values[type]) <= 10000)) {
+      return json(400, { error: "Enter a valid positive price for both BECE and WASSCE." });
+    }
+    for (const type of ["BECE", "WASSCE"] as const) {
+      if (Number(values[type]) < pricing.agent_prices[type]) return json(400, { error: `Your ${type} storefront price must be at least ${pricing.agent_prices[type].toFixed(2)} GHS.` });
+    }
+    const { error } = await service.from("agent_result_checker_prices").upsert([
+      { agent_id: signedInUser.id, voucher_type: "BECE", customer_price: Number(values.BECE).toFixed(2), updated_at: new Date().toISOString() },
+      { agent_id: signedInUser.id, voucher_type: "WASSCE", customer_price: Number(values.WASSCE).toFixed(2), updated_at: new Date().toISOString() },
+    ], { onConflict: "agent_id,voucher_type" });
+    if (error) return json(503, { error: "Could not save your result checker storefront prices." });
+    return json(200, { success: true, store_prices: { BECE: Number(values.BECE), WASSCE: Number(values.WASSCE) } });
   }
 
   const voucherType = typeof body.voucher_type === "string" ? body.voucher_type.toUpperCase() : "";
@@ -79,7 +113,18 @@ Deno.serve(async request => {
     let base: URL;
     try { base = new URL(appBase); if (base.protocol !== "https:" || base.pathname !== "/") throw new Error(); }
     catch { return json(503, { error: "APP_BASE_URL must be a secure site origin." }); }
-    const unitPrice = pricing.prices[voucherType as "BECE" | "WASSCE"];
+    let referredBy: string | null = null;
+    let unitPrice = pricing.prices[voucherType as "BECE" | "WASSCE"];
+    let agentCost = 0;
+    if (typeof body.agent_referral_code === "string" && body.agent_referral_code.trim()) {
+      const referralCode = body.agent_referral_code.trim().toUpperCase();
+      const { data: agent } = await service.from("agent_accounts").select("user_id").eq("referral_code", referralCode).eq("is_active", true).maybeSingle();
+      if (!agent) return json(400, { error: "This agent store link is no longer active." });
+      referredBy = agent.user_id;
+      agentCost = pricing.agent_prices[voucherType as "BECE" | "WASSCE"];
+      const { data: customPrice } = await service.from("agent_result_checker_prices").select("customer_price").eq("agent_id", referredBy).eq("voucher_type", voucherType).maybeSingle();
+      if (customPrice) unitPrice = Number(customPrice.customer_price);
+    }
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) return json(400, { error: "This checker does not have a valid customer price yet." });
     const total = Math.round(unitPrice * quantity * 100) / 100;
     const { data: feeSetting } = await service.from("platform_settings").select("value").eq("key", "paystack_fee_recovery").maybeSingle();
@@ -89,15 +134,10 @@ Deno.serve(async request => {
     const charge = total + fee;
     if (charge <= 0 || charge > 10000) return json(400, { error: "The checker purchase exceeds the maximum checkout amount." });
     const paystackReference = `RCHK-${crypto.randomUUID().replaceAll("-", "")}`;
-    let referredBy: string | null = null;
-    if (typeof body.agent_referral_code === "string" && body.agent_referral_code.trim()) {
-      const { data: agent } = await service.from("agent_accounts").select("user_id").eq("referral_code", body.agent_referral_code.trim().toUpperCase()).eq("is_active", true).maybeSingle();
-      if (!agent) return json(400, { error: "This agent store link is no longer active." });
-      referredBy = agent.user_id;
-    }
     const { data: created, error: insertError } = await service.from("result_checker_orders").insert({
       user_id: signedInUser?.id ?? null, referred_by_agent_id: referredBy, voucher_type: voucherType, recipient_phone: phone,
       quantity, unit_price: unitPrice, total_amount: total, fee_amount: fee, charge_amount: charge,
+      agent_cost: agentCost, agent_profit_amount: referredBy ? Math.max(0, unitPrice - agentCost) * quantity : 0,
       payment_method: "paystack", payment_reference: paystackReference, payment_status: "unpaid", status: "pending_payment",
     }).select("id").single();
     if (insertError || !created) return json(503, { error: "Could not create a checker checkout. No payment was taken." });
