@@ -19,4 +19,7 @@ verify_jwt = false
 [functions.admin-paystack-agent-cashout]
 verify_jwt = false
 
+[functions.result-checker-api]
+verify_jwt = false
+
 

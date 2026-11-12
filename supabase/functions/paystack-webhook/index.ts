@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { purchaseDataHubVouchers } from "../_shared/datahub-vouchers.ts";
 
 const response = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -79,6 +80,62 @@ Deno.serve(async (request: Request) => {
     return response(200, { received: true, agentCashoutTransfer: status });
   }
   if (eventName !== "charge.success" || !reference) return response(200, { received: true });
+
+  if (reference.startsWith("RCHK-")) {
+    if (!datahubKey) return response(503, { error: "DataHub voucher delivery is not configured; Paystack may retry this webhook." });
+    const { data: checker, error: checkerError } = await service.from("result_checker_orders")
+      .select("id,voucher_type,recipient_phone,quantity,total_amount,charge_amount,status,payment_status,refund_status")
+      .eq("payment_reference", reference).maybeSingle();
+    if (checkerError) return response(500, { error: "Could not load the result checker purchase." });
+    if (!checker) return response(200, { received: true, ignored: true });
+    if (checker.status !== "pending_payment") return response(200, { received: true, duplicate: true, status: checker.status });
+    let verification: any;
+    try {
+      const verified = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+        headers: { Authorization: `Bearer ${secret}`, Accept: "application/json" }, signal: AbortSignal.timeout(10000),
+      });
+      verification = await verified.json().catch(() => null);
+      const requested = verification?.data?.requested_amount;
+      if (!verified.ok || verification?.status !== true || verification?.data?.status !== "success" ||
+          verification.data.reference !== reference || verification.data.currency !== "GHS" ||
+          !Number.isSafeInteger(verification.data.amount) || !Number.isSafeInteger(requested) ||
+          verification.data.amount < requested || requested !== Math.round(Number(checker.charge_amount) * 100)) {
+        return response(200, { received: true, verified: false });
+      }
+    } catch { return response(500, { error: "Could not verify checker payment; Paystack may retry this webhook." }); }
+    const { data: claimed, error: claimError } = await service.from("result_checker_orders")
+      .update({ payment_status: "successful", status: "processing", updated_at: new Date().toISOString() })
+      .eq("id", checker.id).eq("status", "pending_payment").select("id").maybeSingle();
+    if (claimError) return response(500, { error: "Could not claim the verified checker payment." });
+    if (!claimed) return response(200, { received: true, duplicate: true });
+    const origin = appBase;
+    const purchased = await purchaseDataHubVouchers(datahubKey, checker.voucher_type, checker.recipient_phone, checker.quantity, origin);
+    if (purchased.ok) {
+      const { error } = await service.rpc("finish_result_checker_order", { p_order_id: checker.id, p_status: "completed",
+        p_vouchers: purchased.result.vouchers, p_transactions: purchased.result.transactions, p_message: purchased.result.message });
+      if (error) return response(500, { error: "Voucher purchase succeeded but could not be saved; reconcile the checker order." });
+      return response(200, { received: true, resultChecker: "completed" });
+    }
+    if (purchased.definite) {
+      const refundReference = `RCREF-${checker.id.replaceAll("-", "")}`;
+      try {
+        const refundResponse = await fetch("https://api.paystack.co/refund", { method: "POST",
+          headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ transaction: reference, amount: verification.data.amount, currency: "GHS", reference: refundReference,
+            customer_note: "Refund for unavailable result checker voucher", merchant_note: `DataHub rejected checker order ${reference}` }),
+          signal: AbortSignal.timeout(15000) });
+        const refund = await refundResponse.json().catch(() => null);
+        if (refundResponse.ok && refund?.status === true) {
+          await service.from("result_checker_orders").update({ status: "failed", refund_status: "pending", provider_message: `${purchased.message} Refund queued with Paystack.`, updated_at: new Date().toISOString() }).eq("id", checker.id);
+          return response(200, { received: true, resultChecker: "refunded", refund_status: "pending" });
+        }
+      } catch { /* Fall through to manual reconciliation if Paystack's refund response is uncertain. */ }
+      await service.from("result_checker_orders").update({ status: "needs_review", refund_status: "failed", provider_message: `${purchased.message} Automatic Paystack refund could not be confirmed. Admin review required.`, updated_at: new Date().toISOString() }).eq("id", checker.id);
+      return response(200, { received: true, resultChecker: "needs_review" });
+    }
+    await service.from("result_checker_orders").update({ status: "needs_review", provider_message: purchased.message, updated_at: new Date().toISOString() }).eq("id", checker.id);
+    return response(200, { received: true, resultChecker: "needs_review" });
+  }
 
   const { data: deposit, error: depositError } = await service.from("deposits")
     .select("id,amount,fee_amount,charge_amount,status").eq("provider", "paystack").eq("provider_reference", reference).maybeSingle();
