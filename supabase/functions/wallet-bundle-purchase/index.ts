@@ -40,7 +40,7 @@ Deno.serve(async (request: Request) => {
   const serviceKey = readKey("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
   const datahubKey = Deno.env.get("DATAHUB_API_KEY")?.trim();
   const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
-  const appBase = (Deno.env.get("APP_BASE_URL")?.trim() || "https://cheapdatabundle.wittymultimedia.com").replace(/\/+$/, "");
+  const appBase = (Deno.env.get("APP_BASE_URL")?.trim() || "https://cheapdatabundle.com").replace(/\/+$/, "");
   const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://console.hubnet.app").replace(/\/+$/, "");
   if (!supabaseUrl || !anonKey || !serviceKey) {
     return json(503, { error: "Wallet bundle delivery is not fully configured on the server." });

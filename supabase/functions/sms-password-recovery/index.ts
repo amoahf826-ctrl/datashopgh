@@ -36,7 +36,7 @@ Deno.serve(async (request: Request) => {
     if (!/^\S+@\S+\.\S+$/.test(email)) return json(400, { error: "Enter the email address on your account." });
     const challengeId = String(body.challenge_id ?? "");
     if (!/^[0-9a-f-]{36}$/i.test(challengeId)) return json(400, { error: "Could not start password recovery. Please try again." });
-    const appOrigin = (Deno.env.get("APP_BASE_URL") || request.headers.get("origin") || "https://cheapdatabundle.wittymultimedia.com").replace(/\/+$/, "");
+    const appOrigin = (Deno.env.get("APP_BASE_URL") || request.headers.get("origin") || "https://cheapdatabundle.com").replace(/\/+$/, "");
     const redirectTo = `${appOrigin}/`;
 
     const { data: profile } = await service.from("profiles").select("id").eq("email", email).maybeSingle();

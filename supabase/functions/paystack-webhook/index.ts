@@ -41,7 +41,7 @@ Deno.serve(async (request: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = readSupabaseServiceKey();
   const datahubKey = Deno.env.get("DATAHUB_API_KEY")?.trim();
-  const appBase = (Deno.env.get("APP_BASE_URL")?.trim() || "https://cheapdatabundle.wittymultimedia.com").replace(/\/+$/, "");
+  const appBase = (Deno.env.get("APP_BASE_URL")?.trim() || "https://cheapdatabundle.com").replace(/\/+$/, "");
   if (!secret || !supabaseUrl || !serviceKey) return response(503, { error: "Paystack webhook service is not configured." });
 
   const raw = await request.text();
