@@ -75,7 +75,13 @@ Deno.serve(async request => {
       { agent_id: signedInUser.id, voucher_type: "BECE", customer_price: Number(values.BECE).toFixed(2), updated_at: new Date().toISOString() },
       { agent_id: signedInUser.id, voucher_type: "WASSCE", customer_price: Number(values.WASSCE).toFixed(2), updated_at: new Date().toISOString() },
     ], { onConflict: "agent_id,voucher_type" });
-    if (error) return json(503, { error: "Could not save your result checker storefront prices." });
+    if (error) {
+      console.error("Agent result checker price upsert failed.", error.code ?? "unknown");
+      if (error.code === "42P01" || error.code === "PGRST205") {
+        return json(503, { error: "Agent storefront price storage is missing. Apply migration 202611120003_agent_result_checker_prices.sql, then retry." });
+      }
+      return json(503, { error: `Could not save your result checker storefront prices (${error.code ?? "database error"}).` });
+    }
     return json(200, { success: true, store_prices: { BECE: Number(values.BECE), WASSCE: Number(values.WASSCE) } });
   }
 
