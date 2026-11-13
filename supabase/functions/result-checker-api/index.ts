@@ -39,9 +39,17 @@ Deno.serve(async request => {
     let agentPrices: typeof pricing.agent_prices | undefined;
     let storePrices: typeof pricing.prices | undefined;
     if (signedInUser) {
-      const { data: agent } = await service.from("agent_accounts").select("user_id").eq("user_id", signedInUser.id).eq("is_active", true).maybeSingle();
+      const { data: agent } = await service.from("agent_accounts").select("user_id,agent_type").eq("user_id", signedInUser.id).eq("is_active", true).maybeSingle();
       if (agent) {
         agentPrices = pricing.agent_prices;
+        if (agent.agent_type === "super_agent") {
+          const { data: specialPrices, error: specialPriceError } = await service.from("super_agent_result_checker_prices").select("voucher_type,override_price").eq("super_agent_id", signedInUser.id);
+          if (specialPriceError) {
+            console.error("Could not read Super Agent checker prices.", specialPriceError.code ?? "unknown");
+            return json(503, { error: "Could not load Super Agent checker prices. Apply migration 202611130001_super_agent_service_prices.sql." });
+          }
+          for (const row of specialPrices ?? []) if (row.voucher_type === "BECE" || row.voucher_type === "WASSCE") agentPrices[row.voucher_type] = Number(row.override_price);
+        }
         const { data: overrides, error: overrideError } = await service.from("agent_result_checker_prices").select("voucher_type,customer_price").eq("agent_id", signedInUser.id);
         if (overrideError) {
           console.error("Could not read agent result checker prices.", overrideError.code ?? "unknown");
