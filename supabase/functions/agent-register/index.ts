@@ -18,11 +18,6 @@ function readKey(legacyName: string, collectionName: string): string | undefined
     return typeof first === "string" ? first : undefined;
   } catch { return undefined; }
 }
-function normalizePhone(value: unknown): string {
-  const digits = String(value ?? "").replace(/\D/g, "");
-  return digits.startsWith("233") ? `0${digits.slice(3)}` : digits;
-}
-
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
@@ -55,35 +50,9 @@ Deno.serve(async (request: Request) => {
   if (rateError) return json(503, { error: "Agent registration is temporarily unavailable. Apply the agent signup migration and try again." });
   if (allowed !== true) return json(429, { error: "Too many registration attempts. Please wait and try again." });
 
-  // Admin removal preserves the auth identity and its financial history. Let
-  // that same owner restore the account by proving the existing password.
-  const { data: priorProfile, error: profileLookupError } = await service.from("profiles")
-    .select("id,phone").eq("email", email).maybeSingle();
-  if (profileLookupError) return json(503, { error: "Could not check your previous account. Please try again." });
-  if (priorProfile) {
-    const { data: priorAgent, error: agentLookupError } = await service.from("agent_accounts")
-      .select("user_id,phone,deleted_at").eq("user_id", priorProfile.id).maybeSingle();
-    if (agentLookupError) return json(503, { error: "Could not check your previous agent account. Please try again." });
-    if (priorAgent?.deleted_at && normalizePhone(priorProfile.phone || priorAgent.phone) === phone) {
-      const { data: signedIn, error: signInError } = await client.auth.signInWithPassword({ email, password });
-      if (signInError || !signedIn.session) {
-        return json(401, { error: "This account was previously removed. Enter its existing password or reset that password to register again." });
-      }
-      const username = email.split("@")[0].toLowerCase().slice(0, 64) || "agent";
-      const { error: restoreError } = await service.from("agent_accounts").update({
-        is_active: true, deleted_at: null, agent_type: "agent", api_access_enabled: false,
-        overdraft_enabled: false, username, business_name: fullName, phone,
-      }).eq("user_id", priorProfile.id).not("deleted_at", "is", null);
-      if (restoreError) return json(503, { error: "Your account was verified, but restoration failed. Please contact the administrator." });
-      const { error: profileUpdateError } = await service.from("profiles").update({ full_name: fullName, phone }).eq("id", priorProfile.id);
-      if (profileUpdateError) return json(503, { error: "Your agent access was restored, but profile details could not be updated. Please contact support." });
-      await service.auth.admin.updateUserById(priorProfile.id, {
-        user_metadata: { full_name: fullName, phone, account_type: "agent" },
-      });
-      return json(200, { success: true, session: signedIn.session, restored: true });
-    }
-  }
-
+  // Deleted accounts must be permanently removed by an administrator before
+  // their email and phone can be registered again. Never restore a soft-deleted
+  // account from this public signup endpoint.
   const { data: phoneInUse, error: phoneError } = await service.rpc("is_profile_phone_in_use", { p_phone: phone });
   if (phoneError) return json(503, { error: "Could not check whether this phone number is already registered." });
   if (phoneInUse === true) return json(409, { error: "This phone number is already linked to an account. Use another number or sign in to that account." });
@@ -93,8 +62,11 @@ Deno.serve(async (request: Request) => {
     user_metadata: { full_name: fullName, phone, account_type: "agent" },
   });
   if (createError || !created.user) {
-    if (/phone|profiles_phone_unique_normalized|duplicate key/i.test(createError?.message ?? "")) {
+    if (/phone|profiles_phone_unique_normalized/i.test(createError?.message ?? "")) {
       return json(409, { error: "This phone number is already linked to an account. Use another number or sign in to that account." });
+    }
+    if (/email.*already|already.*email|user already registered|already registered|duplicate key/i.test(createError?.message ?? "")) {
+      return json(409, { error: "This email is still linked to an account. Sign in, or ask the administrator to permanently delete the previous account before registering again." });
     }
     return json(400, { error: createError?.message ?? "Agent registration could not be completed." });
   }
