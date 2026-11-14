@@ -96,6 +96,7 @@
 .afa-consent{display:flex!important;grid-template-columns:auto 1fr!important;align-items:flex-start;font-weight:500!important;line-height:1.5}.afa-consent input{width:16px!important;min-height:16px!important;margin:0}.admin-afa-private{grid-column:1/-1;font:400 11px/1.6 'DM Sans';color:#66736b}.admin-afa-private summary{cursor:pointer;font-weight:700}.admin-afa-private p{margin:6px 0 0;overflow-wrap:anywhere}
 
 .admin-afa-nav{display:flex;flex-wrap:wrap;gap:9px;padding:2px 0}.admin-afa-nav a,.admin-afa-nav button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border:1px solid #e2e7eb;border-radius:12px;background:#fff;color:#263448;text-decoration:none;font:700 11px 'DM Sans';cursor:pointer}.admin-afa-nav a:hover,.admin-afa-nav button:hover{border-color:#9cddb8;background:#f1fbf5;color:#08783c}.admin-afa-workbench [id]{scroll-margin-top:18px}
+.admin-afa-agent-select{display:grid;gap:8px;max-width:620px;margin:12px 0 18px;color:#344054;font-size:12px;font-weight:700}.admin-afa-agent-select select{box-sizing:border-box;width:100%;min-height:48px;padding:0 12px;border:1px solid #d8dee8;border-radius:12px;background:#fff;color:#172033;font:500 14px 'DM Sans',sans-serif}
 
 .shop-footer,.dashboard-footer,.track-footer{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:4px;text-align:center}.shop-footer strong,.dashboard-footer strong,.track-footer strong{font-weight:800}.shop-footer span,.dashboard-footer span,.track-footer span{display:inline;color:inherit}
 
