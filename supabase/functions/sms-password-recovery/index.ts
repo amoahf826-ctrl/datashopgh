@@ -28,18 +28,24 @@ Deno.serve(async (request: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY");
   if (!url || !anon || !serviceKey) return json(503, { error: "Password recovery is temporarily unavailable." });
   const service = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  let body: { operation?: string; email?: string; challenge_id?: string; code?: string; password?: string; redirect_to?: string };
+  let body: { operation?: string; email?: string; phone?: string; challenge_id?: string; code?: string; password?: string; redirect_to?: string };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }
 
   if (body.operation === "request") {
-    const email = String(body.email ?? "").trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(email)) return json(400, { error: "Enter the email address on your account." });
+    const emailInput = String(body.email ?? "").trim().toLowerCase();
+    const phoneInput = String(body.phone ?? "").replace(/\D/g, "");
+    const recoveryPhone = phoneInput.startsWith("233") && phoneInput.length === 12 ? `0${phoneInput.slice(3)}` : phoneInput;
+    const byPhone = /^0\d{9}$/.test(recoveryPhone);
+    if (!byPhone && !/^\S+@\S+\.\S+$/.test(emailInput)) return json(400, { error: "Enter the account email address or verified Ghana phone number." });
     const challengeId = String(body.challenge_id ?? "");
     if (!/^[0-9a-f-]{36}$/i.test(challengeId)) return json(400, { error: "Could not start password recovery. Please try again." });
     const appOrigin = (Deno.env.get("APP_BASE_URL") || request.headers.get("origin") || "https://cheapdatabundle.com").replace(/\/+$/, "");
     const redirectTo = `${appOrigin}/`;
 
-    const { data: profile } = await service.from("profiles").select("id").eq("email", email).maybeSingle();
+    const { data: profile } = byPhone
+      ? await service.from("profiles").select("id,email,phone").eq("phone", recoveryPhone).limit(1).maybeSingle()
+      : await service.from("profiles").select("id,email,phone").eq("email", emailInput).limit(1).maybeSingle();
+    const email = String(profile?.email ?? (!byPhone ? emailInput : "")).trim().toLowerCase();
     let verifiedPhone = "";
     if (profile?.id) {
       const { data: result } = await service.auth.admin.getUserById(profile.id);
@@ -79,7 +85,7 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    if (shouldUseEmail) {
+    if (shouldUseEmail && email) {
       const auth = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
       await auth.auth.resetPasswordForEmail(email, { redirectTo });
     }

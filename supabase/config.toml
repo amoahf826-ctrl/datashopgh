@@ -25,4 +25,7 @@ verify_jwt = false
 [functions.storefront-number-verification]
 verify_jwt = false
 
+[functions.sms-phone-signup-otp]
+verify_jwt = false
+
 
