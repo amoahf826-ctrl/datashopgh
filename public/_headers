@@ -1,0 +1,14 @@
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/sw.js
+  Cache-Control: no-cache
+
+/app.webmanifest
+  Cache-Control: no-cache
+
+/cheapdatabundle-logo.*
+  Cache-Control: public, max-age=86400
+
+/icons/*
+  Cache-Control: public, max-age=604800
