@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.sms-password-recovery]
 verify_jwt = false
+
+[functions.agent-register]
+verify_jwt = false
