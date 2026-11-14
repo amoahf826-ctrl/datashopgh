@@ -1,7 +1,7 @@
 import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 const AdminPanel=lazy(()=>import('./AdminPanel'));
-import DashboardPage from './DashboardPage';
+const DashboardPage=lazy(()=>import('./DashboardPage'));
 const AgentDashboardPage=lazy(()=>import('./AgentDashboardPage'));
 import PasswordResetModal from './PasswordResetModal';
 const Storefront=lazy(()=>import('./Storefront'));

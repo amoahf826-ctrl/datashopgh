@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.africastalking-ussd]
 verify_jwt = false
+
+[functions.admin-delete-account]
+verify_jwt = false
