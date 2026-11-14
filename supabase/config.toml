@@ -22,4 +22,7 @@ verify_jwt = false
 [functions.result-checker-api]
 verify_jwt = false
 
+[functions.storefront-number-verification]
+verify_jwt = false
+
 
