@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { verifyConfiguredNumber } from "../_shared/numberVerification.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,14 +47,34 @@ Deno.serve(async (request: Request) => {
   }
 
   const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const referralCode = typeof body.agent_referral_code === "string" ? body.agent_referral_code.trim().toUpperCase() : null;
   const { data: setting, error: settingError } = await service.from("platform_settings")
     .select("value").eq("key", "storefront_live_sales").maybeSingle();
   if (settingError || setting?.value?.enabled !== true) return json(503, { error: "Live checkout is not enabled yet." });
 
+  const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-real-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const verificationHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${ip}|${referralCode || "main-store"}`));
+  const verificationRateKey = `number-verification:${Array.from(new Uint8Array(verificationHash)).map(value => value.toString(16).padStart(2, "0")).join("")}`;
+  const { data: verificationAllowed, error: verificationRateError } = await service.rpc("consume_public_number_verification_rate_limit", {
+    p_rate_key: verificationRateKey, p_limit: 10,
+  });
+  if (verificationRateError) return json(503, { error: "Number verification is temporarily unavailable. No payment was started." });
+  if (verificationAllowed !== true) return json(429, { error: "Too many number checks. Please wait a few minutes and try again. No payment was started." });
+  const numberCheck = await verifyConfiguredNumber(service, body.recipient_phone);
+  if ("error" in numberCheck) return json(502, { error: `${numberCheck.error} No payment was started.` });
+  if (numberCheck.status !== "verified") {
+    const reason = numberCheck.status === "unverified"
+      ? "Phone Number is Not Verified. You can't buy Data Now.Check again Next Week untill your Number is Verified."
+      : numberCheck.status === "queued"
+        ? "Number verification is still processing. Please try again in a moment."
+        : "This phone number could not be verified. Check the number and try again.";
+    return json(422, { error: `${reason} No payment was started.`, verification_status: numberCheck.status });
+  }
+
   const orderId = crypto.randomUUID();
   const paystackReference = `DSGH-${crypto.randomUUID().replaceAll("-", "")}`;
   const deliveryReference = `DS${orderId.replaceAll("-", "").slice(0, 23)}`;
-  const referralCode = typeof body.agent_referral_code === "string" ? body.agent_referral_code : null;
   const created = signedInUser
     ? await service.rpc("create_live_checkout_order", {
       p_user_id: signedInUser.id, p_bundle_id: body.bundle_id, p_recipient_phone: body.recipient_phone,
