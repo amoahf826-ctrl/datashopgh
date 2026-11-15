@@ -82,7 +82,7 @@ export default function App(){
   if(supabase){
    const result=await supabase.auth.signInWithPassword({email,password});setBusy(false);
    if(result.error){setNotice(result.error.message);return;}
-   setModal(null);setNotice('');if(returnToAdmin)adminLoginPending.current=true;return;
+   setModal(null);setNotice('Welcome to your dashboard.');if(returnToAdmin)adminLoginPending.current=true;return;
   }
   setUser({email,user_metadata:kind==='signup'?{full_name:fullName.trim(),phone:normalizedPhone,...(signupAsAgent?{account_type:'agent'}:{})}:{}});
   setBusy(false);setModal(null);setNotice('');go('dashboard');
