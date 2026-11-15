@@ -9,3 +9,4 @@ netlify-deploy.zip
 .supabase-home/
 supabase/.temp/
 *.tsbuildinfo
+android/.gradle-user-home/

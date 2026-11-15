@@ -1,4 +1,4 @@
-package com.wittytechnologies.datashopgh;
+package com.cheapdatabundle.app;
 
 import com.getcapacitor.BridgeActivity;
 
