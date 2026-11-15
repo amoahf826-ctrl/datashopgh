@@ -65,6 +65,66 @@ img, svg { max-width: 100%; }
 .agent-field input, .agent-field select, .agent-field textarea { min-height: 44px; font-size: var(--type-small); }
 .agent-dashboard-active :is(.agent-field small, .agent-tool-panel small, .agent-order-panel small) { font-size: var(--type-caption); line-height: 1.45; }
 
+/* Statistics typography follows the Admin Data Plans page scale. */
+.statistics-view { gap: 14px; }
+.statistics-filter { padding: 18px 20px; }
+.statistics-section-title { gap: 4px; margin-bottom: 12px; }
+.statistics-section-title h2 { font-size: 18px; line-height: 1.35; }
+.statistics-section-title span { font-size: 12px; line-height: 1.5; }
+.statistics-filter-grid { gap: 12px; }
+.statistics-filter-grid label { gap: 6px; font-size: 12px; }
+.statistics-filter-grid select,
+.statistics-filter-grid input { height: 42px; padding-inline: 12px; border-radius: 11px; font-size: 14px; }
+.statistics-filter-grid > button { height: 42px; padding-inline: 14px; border-radius: 11px; font-size: 13px; }
+.statistics-error { font-size: 12px; line-height: 1.5; }
+.statistics-metrics { gap: 12px; }
+.statistics-metric { min-height: 82px; gap: 5px; padding: 12px 14px; border-radius: 16px; }
+.statistics-metric > small { font-size: 12px; }
+.statistics-metric > b { font-size: 20px; line-height: 1.25; }
+.statistics-metric > span { font-size: 11px; line-height: 1.4; }
+.statistics-source-card { padding: 14px 16px; border-radius: 16px; }
+.statistics-source-card h2 { margin-bottom: 8px; font-size: 14px; }
+.statistics-source-card > div { padding: 7px 0; font-size: 12px; }
+.statistics-network { border-radius: 17px; }
+.statistics-network > header { min-height: 52px; padding: 10px 14px; }
+.statistics-network > header > div > b { font-size: 14px; }
+.statistics-network > header > div > span { font-size: 11px; line-height: 1.45; }
+.statistics-network > header > strong { font-size: 15px; }
+.statistics-network > header > strong small { font-size: 11px; }
+.statistics-plan-group { margin: 10px; padding: 10px; border-radius: 14px; }
+.statistics-plan-heading { padding: 0 3px 8px; }
+.statistics-plan-heading > b,
+.statistics-plan-heading > span { font-size: 12px; }
+.statistics-plan-grid { gap: 9px; }
+.statistics-plan { min-height: 78px; gap: 5px; padding: 10px; border-radius: 12px; }
+.statistics-plan > span { top: 7px; right: 7px; padding: 3px 6px; font-size: 10px; }
+.statistics-plan > b,
+.statistics-plan > strong { font-size: 14px; }
+.statistics-plan > small { font-size: 12px; }
+.statistics-plan > em { font-size: 11px; }
+.statistics-empty { padding: 20px; font-size: 14px; }
+
+@media (max-width: 620px) {
+  .statistics-filter { padding: 14px; }
+  .statistics-filter-grid { gap: 9px; }
+  .statistics-filter-grid select,
+  .statistics-filter-grid input,
+  .statistics-filter-grid > button { height: 42px; font-size: 13px; }
+  .statistics-filter-grid label { font-size: 12px; }
+  .statistics-metric { min-height: 78px; padding: 10px; }
+  .statistics-metric > small { font-size: 11px; }
+  .statistics-metric > b { font-size: 18px; }
+  .statistics-metric > span { font-size: 10px; }
+  .statistics-source-card h2 { font-size: 14px; }
+  .statistics-source-card > div { font-size: 12px; }
+  .statistics-network > header > div > span { max-width: none; }
+  .statistics-plan { min-height: 76px; padding: 9px; }
+  .statistics-plan > b,
+  .statistics-plan > strong { font-size: 13px; }
+  .statistics-plan > small { font-size: 11px; }
+  .statistics-plan > em { font-size: 10px; }
+}
+
 .track-form label, .result-checker-form label { font-size: var(--type-caption); line-height: 1.45; }
 .track-form input, .track-form select, .result-checker-form input, .result-checker-form select { min-height: 48px; font-size: var(--type-small); }
 .track-hint, .track-error, .tracked-order-main small, .track-no-results { font-size: var(--type-caption); line-height: 1.5; }
