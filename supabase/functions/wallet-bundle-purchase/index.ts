@@ -18,6 +18,30 @@ function normalizeDeliveryStatus(value: unknown): "delivered" | "failed" | "proc
   return null;
 }
 
+function hubnetResponseStatus(payload: any): "delivered" | "failed" | "processing" | null {
+  const envelope = payload?.response ?? payload;
+  const data = envelope?.data ?? payload?.data ?? {};
+  return normalizeDeliveryStatus(
+    data.delivery_status ?? data.order_status ?? data.orderStatus ?? data.status ??
+    envelope?.delivery_status ?? envelope?.order_status ?? envelope?.orderStatus,
+  );
+}
+
+async function getHubnetOrderStatus(base: string, token: string, reference: string) {
+  const url = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
+  url.searchParams.set("reference", reference);
+  const authHeader = /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
+  const response = await fetch(url, {
+    headers: { token: authHeader, Accept: "application/json" },
+    signal: AbortSignal.timeout(10000),
+  });
+  const payload = await response.json().catch(() => null);
+  const envelope = payload?.response ?? payload;
+  const accepted = envelope?.status === true || envelope?.status === "success" ||
+    payload?.status === true || payload?.status === "success";
+  return response.ok && accepted ? hubnetResponseStatus(payload) : null;
+}
+
 function readKey(legacyName: string, collectionName: string): string | undefined {
   const legacy = Deno.env.get(legacyName)?.trim();
   if (legacy) return legacy;
@@ -157,6 +181,26 @@ Deno.serve(async (request: Request) => {
     const providerStatus = normalizeDeliveryStatus(resultData.status ?? resultData.delivery_status ?? resultData.orderStatus ?? resultData.order_status);
     if (delivery.ok && accepted && (activeProvider === "hubnet" || typeof resultData.reference === "string")) {
       if (providerStatus === "failed") {
+        // Hubnet's purchase response can report a transient/ambiguous status.
+        // Confirm it against the transaction-status endpoint before refunding;
+        // otherwise an order that Hubnet later delivers could be refunded.
+        let confirmedStatus: "delivered" | "failed" | "processing" | null = providerStatus;
+        if (activeProvider === "hubnet") {
+          try { confirmedStatus = await getHubnetOrderStatus(hubnetBase, hubnetToken!, deliveryReference); }
+          catch { confirmedStatus = null; }
+          if (!confirmedStatus) {
+            await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "unknown",
+              p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference });
+            return json(200, { success: true, ...order, delivery_status: "unknown",
+              message: "Hubnet accepted the order, but its final status is not confirmed yet. Please check order history shortly." });
+          }
+          if (confirmedStatus !== "failed") {
+            await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: confirmedStatus,
+              p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference });
+            return json(200, { success: true, ...order, delivery_status: confirmedStatus,
+              message: confirmedStatus === "delivered" ? "Data delivered successfully." : "Hubnet is processing the order." });
+          }
+        }
         await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "failed",
           p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference });
         const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
