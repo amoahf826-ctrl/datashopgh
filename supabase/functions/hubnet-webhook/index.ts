@@ -3,6 +3,36 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const json = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+function mapDeliveryStatus(value: unknown): "delivered" | "failed" | "processing" | null {
+  const state = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(state)) return "delivered";
+  if (["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(state)) return "failed";
+  if (["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(state)) return "processing";
+  return null;
+}
+
+function extractDeliveryStatus(payload: any) {
+  const queue = [{ value: payload, allowStatus: false }];
+  const seen = new Set<object>();
+  while (queue.length) {
+    const { value, allowStatus } = queue.shift()!;
+    if (!value || typeof value !== "object" || seen.has(value)) continue;
+    seen.add(value);
+    for (const key of ["delivery_status", "deliveryStatus", "order_status", "orderStatus"]) {
+      const status = mapDeliveryStatus(value[key]);
+      if (status) return status;
+    }
+    if (allowStatus) {
+      const status = mapDeliveryStatus(value.status);
+      if (status) return status;
+    }
+    for (const key of ["response", "data", "transaction", "order", "result", "details"]) {
+      if (value[key] && typeof value[key] === "object") queue.push({ value: value[key], allowStatus: key !== "response" });
+    }
+  }
+  return null;
+}
+
 function readServiceKey(): string | undefined {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
   if (legacy) return legacy;
@@ -37,12 +67,8 @@ Deno.serve(async (request: Request) => {
     });
     const result = await checked.json().catch(() => null);
     const envelope = result?.response ?? result;
-    const data = envelope?.data ?? result?.data ?? {};
     if (!checked.ok || !(envelope?.status === true || envelope?.status === "success" || result?.status === true || result?.status === "success")) return json(200, { received: true, verified: false });
-    const state = String(data?.delivery_status ?? data?.order_status ?? data?.orderStatus ?? data?.status ?? envelope?.delivery_status ?? envelope?.order_status ?? envelope?.status ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
-    const deliveryStatus = ["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(state) ? "delivered"
-      : ["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(state) ? "failed"
-      : ["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(state) ? "processing" : null;
+    const deliveryStatus = extractDeliveryStatus(result);
     if (!deliveryStatus) return json(200, { received: true, verified: false });
 
     const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
