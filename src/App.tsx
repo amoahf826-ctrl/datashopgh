@@ -63,7 +63,7 @@ export default function App(){
   const digits=signupPhone.replace(/\D/g,'');
   const normalizedPhone=digits.startsWith('233')?'0'+digits.slice(3):digits;
   if(kind==='signup'&&!/^0\d{9}$/.test(normalizedPhone)){setNotice('Enter a valid Ghana phone number, such as 0241234567.');return;}
-  if(password.length<8||password.length>128){setNotice('Your password must have 8 to 128 characters.');return;}
+  if(password.length<4||password.length>128){setNotice('Your password must have 4 to 128 characters.');return;}
   setBusy(true);setNotice('');
   if(supabase&&kind==='signup'&&signupAsAgent){
    const {data,error}=await supabase.functions.invoke('agent-register',{body:{email:email.trim(),password,full_name:fullName.trim(),phone:normalizedPhone}});
