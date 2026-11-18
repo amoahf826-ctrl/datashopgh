@@ -180,7 +180,7 @@ Deno.serve(async (request: Request) => {
   const fallbackProvider = providerSetting?.value?.provider === "hubnet" ? "hubnet" : "datahub";
   const enabledProviders = { datahub: providerSetting?.value?.enabled?.datahub !== false, hubnet: providerSetting?.value?.enabled?.hubnet !== false };
   const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
-  const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://console.hubnet.app").replace(/\/+$/, "");
+  const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://hubnet.app").replace(/\/+$/, "");
   const { data: plan } = await service.from("bundles").select("network,category,subcategory,delivery_provider,delivery_network_type").eq("id", existing.bundle_id).maybeSingle();
   if (!plan) return response(503, { error: "Could not load the selected bundle routing; Paystack may retry this webhook." });
   const route = resolveBundleRoute(plan, fallbackProvider);
@@ -189,7 +189,7 @@ Deno.serve(async (request: Request) => {
   if (activeProvider === "datahub" && !datahubKey) return response(503, { error: "DataHub delivery is not configured; Paystack may retry this webhook." });
   if (activeProvider === "hubnet" && !hubnetToken) return response(503, { error: "Hubnet delivery is not configured; Paystack may retry this webhook." });
   if (activeProvider === "hubnet") {
-    try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "console.hubnet.app" || base.username || base.password) throw new Error(); }
+    try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "hubnet.app" || base.username || base.password) throw new Error(); }
     catch { return response(503, { error: "HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin." }); }
   }
   let networkKey: string;

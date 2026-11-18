@@ -41,7 +41,7 @@ Deno.serve(async (request: Request) => {
   const datahubKey = Deno.env.get("DATAHUB_API_KEY")?.trim();
   const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
   const appBase = (Deno.env.get("APP_BASE_URL")?.trim() || "https://cheapdatabundle.com").replace(/\/+$/, "");
-  const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://console.hubnet.app").replace(/\/+$/, "");
+  const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://hubnet.app").replace(/\/+$/, "");
   if (!supabaseUrl || !anonKey || !serviceKey) {
     return json(503, { error: "Wallet bundle delivery is not fully configured on the server." });
   }
@@ -76,7 +76,7 @@ Deno.serve(async (request: Request) => {
   try { networkKey = activeProvider === "datahub" ? dataHubNetworkKey(route.networkType) : hubnetPath(route.networkType); }
   catch (error) { return json(503, { error: error instanceof Error ? error.message : "Invalid provider network mapping." }); }
   if (activeProvider === "hubnet") {
-    try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "console.hubnet.app" || base.username || base.password) throw new Error(); }
+    try { const base = new URL(hubnetBase); if (base.protocol !== "https:" || base.hostname !== "hubnet.app" || base.username || base.password) throw new Error(); }
     catch { return json(503, { error: "HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin." }); }
   }
   let appOrigin: string;
