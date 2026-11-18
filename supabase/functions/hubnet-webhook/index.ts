@@ -24,7 +24,7 @@ Deno.serve(async (request: Request) => {
 
   let body: any;
   try { body = await request.json(); } catch { return json(400, { error: "Invalid JSON." }); }
-  const reference = body?.reference ?? body?.data?.reference;
+  const reference = body?.reference ?? body?.data?.reference ?? body?.transaction?.reference ?? body?.data?.transaction?.reference;
   if (typeof reference !== "string" || !/^DS[A-Fa-f0-9]{23}$/.test(reference)) return json(400, { error: "Valid order reference is required." });
 
   const authHeader = /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
@@ -39,7 +39,7 @@ Deno.serve(async (request: Request) => {
     const envelope = result?.response ?? result;
     const data = envelope?.data ?? result?.data ?? {};
     if (!checked.ok || !(envelope?.status === true || envelope?.status === "success" || result?.status === true || result?.status === "success")) return json(200, { received: true, verified: false });
-    const state = String(data?.status ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+    const state = String(data?.delivery_status ?? data?.order_status ?? data?.orderStatus ?? data?.status ?? envelope?.delivery_status ?? envelope?.order_status ?? envelope?.status ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
     const deliveryStatus = ["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(state) ? "delivered"
       : ["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(state) ? "failed"
       : ["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(state) ? "processing" : null;
