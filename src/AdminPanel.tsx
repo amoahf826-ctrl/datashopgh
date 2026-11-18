@@ -146,7 +146,7 @@ function OrdersWorkbench({orders,refundedOrderIds,summary,loading,onApplyDates,o
  const [range,setRange]=useState('today'),[start,setStart]=useState(today),[end,setEnd]=useState(today);
  const pending=orders.filter(order=>order.status==='pending'&&order.is_demo);
  const refundedIds=new Set(refundedOrderIds);
- const liveOrders=orders.filter(order=>!order.is_demo);
+ const liveOrders=orders.filter(order=>!order.is_demo&&order.payment_status==='successful');
  const refundedOrders=liveOrders.filter(order=>refundedIds.has(String(order.id)));
  const failedOrders=liveOrders.filter(order=>!refundedIds.has(String(order.id))&&(order.status==='failed'||order.delivery_status==='failed'));
  const completedOrders=liveOrders.filter(order=>!refundedIds.has(String(order.id))&&!failedOrders.includes(order)&&(order.status==='successful'||order.delivery_status==='delivered'));
