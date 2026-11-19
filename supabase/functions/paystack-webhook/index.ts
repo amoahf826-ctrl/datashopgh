@@ -13,6 +13,13 @@ function normalizeDeliveryStatus(value: unknown): "delivered" | "failed" | "proc
   return null;
 }
 
+function hubnetExplicitlyRejected(payload: any): boolean {
+  const envelope = payload?.response ?? payload;
+  const status = String(envelope?.status ?? payload?.status ?? "").trim().toLowerCase();
+  return envelope?.status === false || payload?.status === false || envelope?.success === false || payload?.success === false ||
+    ["failed", "failure", "rejected", "error"].includes(status);
+}
+
 function readSupabaseServiceKey(): string | undefined {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
   if (legacy) return legacy;
@@ -264,7 +271,16 @@ Deno.serve(async (request: Request) => {
       ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
       : result?.success === true;
     const providerStatus = normalizeDeliveryStatus(resultData.status ?? resultData.delivery_status ?? resultData.orderStatus ?? resultData.order_status);
-    if (delivery.ok && accepted && (providerStatus === "failed" || activeProvider === "hubnet" || typeof resultData.reference === "string")) {
+    if (activeProvider === "hubnet" && delivery.ok && !accepted && hubnetExplicitlyRejected(result)) {
+      const reason = String(envelope?.message ?? result?.message ?? result?.error ?? resultData?.message ?? "")
+        .replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
+      console.error("Hubnet rejected paid delivery", { reference: claim.delivery_reference, networkKey, httpStatus: delivery.status, reason });
+      await service.rpc("update_live_order_delivery", {
+        p_reference: claim.delivery_reference,
+        p_delivery_status: "failed",
+        p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? claim.delivery_reference,
+      });
+    } else if (delivery.ok && accepted && (providerStatus === "failed" || activeProvider === "hubnet" || typeof resultData.reference === "string")) {
       const transactionReference = resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? claim.delivery_reference;
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,

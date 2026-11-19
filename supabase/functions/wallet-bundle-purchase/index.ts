@@ -27,6 +27,13 @@ function hubnetResponseStatus(payload: any): "delivered" | "failed" | "processin
   );
 }
 
+function hubnetExplicitlyRejected(payload: any): boolean {
+  const envelope = payload?.response ?? payload;
+  const status = String(envelope?.status ?? payload?.status ?? "").trim().toLowerCase();
+  return envelope?.status === false || payload?.status === false || envelope?.success === false || payload?.success === false ||
+    ["failed", "failure", "rejected", "error"].includes(status);
+}
+
 async function getHubnetOrderStatus(base: string, token: string, reference: string) {
   const url = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
   url.searchParams.set("reference", reference);
@@ -179,6 +186,19 @@ Deno.serve(async (request: Request) => {
       ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
       : result?.success === true;
     const providerStatus = normalizeDeliveryStatus(resultData.status ?? resultData.delivery_status ?? resultData.orderStatus ?? resultData.order_status);
+    if (activeProvider === "hubnet" && delivery.ok && !accepted && hubnetExplicitlyRejected(result)) {
+      const reason = String(envelope?.message ?? result?.message ?? result?.error ?? resultData?.message ?? "")
+        .replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
+      console.error("Hubnet rejected wallet delivery", { reference: deliveryReference, networkType, httpStatus: delivery.status, reason });
+      await service.rpc("update_live_order_delivery", {
+        p_reference: deliveryReference,
+        p_delivery_status: "failed",
+        p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference,
+      });
+      const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
+      return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
+        message: refundError ? "The order was rejected. Contact support to reconcile your wallet." : `The order was rejected${reason ? `: ${reason}` : ""}. Your wallet has been refunded.` });
+    }
     if (delivery.ok && accepted && (activeProvider === "hubnet" || typeof resultData.reference === "string")) {
       if (providerStatus === "failed") {
         // Hubnet's purchase response can report a transient/ambiguous status.
@@ -206,7 +226,7 @@ Deno.serve(async (request: Request) => {
         const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
         const providerReason = String(resultData.message ?? result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
         return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
-          message: refundError ? "The provider reported a failed delivery. Contact support to reconcile your wallet." : `The ${activeProvider === "hubnet" ? "Hubnet" : "DataHub GH"} provider reported a failed delivery${providerReason ? `: ${providerReason}` : ""}. Your wallet has been refunded.` });
+          message: refundError ? "The provider reported a failed delivery. Contact support to reconcile your wallet." : `Delivery failed${providerReason ? `: ${providerReason}` : ""}. Your wallet has been refunded.` });
       }
       const deliveryStatus = providerStatus ?? "unknown";
       await service.rpc("update_live_order_delivery", {
@@ -228,7 +248,7 @@ Deno.serve(async (request: Request) => {
       });
       return json(200, { success: true, ...order, delivery_status: "failed",
         wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
-        message: refundError ? "The provider rejected delivery. Contact support to reconcile your wallet." : `${activeProvider === "hubnet" ? "Hubnet" : "DataHub GH"} rejected the delivery request${String(result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim() ? `: ${String(result?.message ?? result?.error).replace(/[<>\r\n]+/g, " ").trim().slice(0, 180)}` : ""}. Your wallet has been refunded.` });
+        message: refundError ? "The provider rejected delivery. Contact support to reconcile your wallet." : `Delivery was rejected${String(result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim() ? `: ${String(result?.message ?? result?.error).replace(/[<>\r\n]+/g, " ").trim().slice(0, 180)}` : ""}. Your wallet has been refunded.` });
     }
 
     await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "unknown" });
