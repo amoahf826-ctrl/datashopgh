@@ -181,7 +181,7 @@ Deno.serve(async (request: Request) => {
   const enabledProviders = { datahub: providerSetting?.value?.enabled?.datahub !== false, hubnet: providerSetting?.value?.enabled?.hubnet !== false };
   const hubnetToken = Deno.env.get("HUBNET_BEARER_TOKEN")?.trim();
   const hubnetBase = (Deno.env.get("HUBNET_API_BASE_URL")?.trim() || "https://hubnet.app").replace(/\/+$/, "");
-  const { data: plan } = await service.from("bundles").select("network,category,subcategory,delivery_provider,delivery_network_type").eq("id", existing.bundle_id).maybeSingle();
+  const { data: plan } = await service.from("bundles").select("network,category,subcategory,size,delivery_provider,delivery_network_type").eq("id", existing.bundle_id).maybeSingle();
   if (!plan) return response(503, { error: "Could not load the selected bundle routing; Paystack may retry this webhook." });
   const route = resolveBundleRoute(plan, fallbackProvider);
   const activeProvider = route.provider;
