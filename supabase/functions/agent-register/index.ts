@@ -36,7 +36,7 @@ Deno.serve(async (request: Request) => {
   const rawPhone = typeof body.phone === "string" ? body.phone.replace(/\D/g, "") : "";
   const phone = rawPhone.startsWith("233") ? `0${rawPhone.slice(3)}` : rawPhone;
   if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) return json(400, { error: "Enter a valid email address." });
-  if (password.length < 8 || password.length > 128) return json(400, { error: "Your password must have 8 to 128 characters." });
+  if (password.length < 6 || password.length > 128) return json(400, { error: "Your password must have 6 to 128 characters." });
   if (fullName.length < 2 || fullName.length > 120) return json(400, { error: "Enter your full name." });
   if (!/^0\d{9}$/.test(phone)) return json(400, { error: "Enter a valid Ghana phone number, such as 0241234567." });
 
