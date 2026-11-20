@@ -3,8 +3,8 @@ import { dataHubNetworkKey, hubnetPath, resolveBundleRoute } from "../_shared/bu
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-agent-api-key",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Content-Type": "application/json",
 };
 const json = (status: number, body: Record<string, unknown>) =>
@@ -62,9 +62,9 @@ function readKey(legacyName: string, collectionName: string): string | undefined
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (request.method !== "POST") return json(405, { error: "Method not allowed." });
+  if (request.method !== "POST" && request.method !== "GET") return json(405, { error: "Method not allowed." });
   const authorization = request.headers.get("Authorization");
-  if (!authorization?.startsWith("Bearer ")) return json(401, { error: "Sign in to buy a bundle." });
+  const suppliedApiKey = request.headers.get("x-agent-api-key")?.trim() ?? "";
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = readKey("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
@@ -77,9 +77,63 @@ Deno.serve(async (request: Request) => {
     return json(503, { error: "Wallet bundle delivery is not fully configured on the server." });
   }
 
-  const auth = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
-  const { data: authData, error: authError } = await auth.auth.getUser();
-  if (authError || !authData.user) return json(401, { error: "Your session expired. Sign in again." });
+  const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  let accountUserId: string;
+  let isPartnerApiRequest = false;
+  if (suppliedApiKey) {
+    if (!/^cdb_live_[0-9a-f]{64}$/i.test(suppliedApiKey)) return json(401, { error: "Invalid provider API key." });
+    const keyHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(suppliedApiKey)))).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    const { data: keyRow, error: keyError } = await service.from("agent_partner_api_keys").select("id,agent_id").eq("key_hash", keyHash).is("revoked_at", null).maybeSingle();
+    if (keyError || !keyRow) return json(401, { error: "Invalid or revoked provider API key." });
+    const { data: account, error: accountError } = await service.from("agent_accounts").select("user_id,is_active,deleted_at").eq("user_id", keyRow.agent_id).maybeSingle();
+    if (accountError || !account?.is_active || account.deleted_at) return json(403, { error: "This provider account is inactive." });
+    accountUserId = keyRow.agent_id;
+    isPartnerApiRequest = true;
+    await service.from("agent_partner_api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id);
+  } else {
+    if (!authorization?.startsWith("Bearer ")) return json(401, { error: "Sign in or provide an agent provider API key." });
+    const auth = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
+    const { data: authData, error: authError } = await auth.auth.getUser();
+    if (authError || !authData.user) return json(401, { error: "Your session expired. Sign in again." });
+    accountUserId = authData.user.id;
+  }
+
+  if (request.method === "GET") {
+    if (!isPartnerApiRequest) return json(405, { error: "GET endpoints require an agent provider API key." });
+    const params = new URL(request.url).searchParams;
+    if (params.get("action") === "plans") {
+      const { data: bundles, error: bundlesError } = await service.from("bundles").select("id,network,category,subcategory,size,validity,price,delivery_provider,delivery_network_type").eq("is_active", true).eq("is_demo", false).order("network").order("price");
+      if (bundlesError) return json(500, { error: "Could not load available plans." });
+      const { data: activeNetworks, error: networksError } = await service.from("networks").select("id").eq("is_active", true);
+      if (networksError) return json(500, { error: "Could not load available networks." });
+      const allowedNetworks = new Set((activeNetworks ?? []).map((network) => network.id));
+      const { data: account } = await service.from("agent_accounts").select("agent_type").eq("user_id", accountUserId).maybeSingle();
+      const [{ data: overridesData }, { data: storePrices }, { data: adminPrices }] = await Promise.all([
+        service.from("super_agent_bundle_prices").select("bundle_id,override_price").eq("super_agent_id", accountUserId),
+        service.from("agent_storefront_bundle_prices").select("bundle_id,customer_price").eq("agent_id", accountUserId),
+        service.from("agent_customer_bundle_prices").select("bundle_id,customer_price").eq("agent_id", accountUserId),
+      ]);
+      const overrides: Record<string, number> = {};
+      if (account?.agent_type === "super_agent") {
+        Object.assign(overrides, Object.fromEntries((overridesData ?? []).map((row) => [row.bundle_id, Number(row.override_price)])));
+      }
+      const ownStore = Object.fromEntries((storePrices ?? []).map((row) => [row.bundle_id, Number(row.customer_price)]));
+      const adminStore = Object.fromEntries((adminPrices ?? []).map((row) => [row.bundle_id, Number(row.customer_price)]));
+      return json(200, { success: true, currency: "GHS", plans: (bundles ?? []).filter((plan) => allowedNetworks.has(plan.network)).map((plan) => ({ id: plan.id, network: plan.network, category: plan.category, subcategory: plan.subcategory, size: plan.size, validity: plan.validity, price: ownStore[plan.id] ?? adminStore[plan.id] ?? Number(plan.price), wallet_cost: overrides[plan.id] ?? Number(plan.price) })) });
+    }
+    if (params.get("action") === "status") {
+      const reference = params.get("reference")?.trim() ?? "";
+      if (!reference || reference.length > 100) return json(400, { error: "Provide a valid order reference." });
+      let orderQuery = service.from("orders").select("id,bundle_id,recipient_phone,price,status,payment_status,delivery_status,delivery_reference,created_at,delivery_updated_at,bundles(network,size,category,subcategory)").eq("user_id", accountUserId);
+      if (/^[0-9a-f-]{36}$/i.test(reference)) orderQuery = orderQuery.eq("id", reference);
+      else orderQuery = orderQuery.eq("delivery_reference", reference);
+      const { data: order, error } = await orderQuery.maybeSingle();
+      if (error) return json(500, { error: "Could not check this order." });
+      if (!order) return json(404, { error: "Order not found for this provider account." });
+      return json(200, { success: true, order });
+    }
+    return json(400, { error: "Use action=plans or action=status&reference=…" });
+  }
 
   let body: { bundle_id?: unknown; recipient_phone?: unknown; idempotency_key?: unknown; agent_referral_code?: unknown };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }
@@ -90,7 +144,6 @@ Deno.serve(async (request: Request) => {
     return json(400, { error: "Choose a bundle and enter a valid 10 digit Ghanaian phone number." });
   }
 
-  const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: providerSetting, error: providerSettingError } = await service.from("platform_settings")
     .select("value").eq("key", "active_bundle_provider").maybeSingle();
   if (providerSettingError) return json(503, { error: "Could not read the active bundle provider." });
@@ -123,13 +176,13 @@ Deno.serve(async (request: Request) => {
   const paymentReference = `WALLET-${crypto.randomUUID().replaceAll("-", "")}`;
   const deliveryReference = `DS${crypto.randomUUID().replaceAll("-", "").slice(0, 23)}`;
   const { data: order, error: orderError } = await service.rpc("create_wallet_bundle_order", {
-    p_user_id: authData.user.id,
+    p_user_id: accountUserId,
     p_bundle_id: body.bundle_id,
     p_recipient_phone: body.recipient_phone,
     p_idempotency_key: body.idempotency_key,
     p_payment_reference: paymentReference,
     p_delivery_reference: deliveryReference,
-    p_agent_referral_code: typeof body.agent_referral_code === "string" ? body.agent_referral_code : null,
+    p_agent_referral_code: !isPartnerApiRequest && typeof body.agent_referral_code === "string" ? body.agent_referral_code : null,
   });
   if (orderError || !order) {
     const message = orderError?.message ?? "Could not place this wallet order.";

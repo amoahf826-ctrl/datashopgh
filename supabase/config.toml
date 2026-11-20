@@ -39,6 +39,9 @@ verify_jwt = false
 [functions.agent-register]
 verify_jwt = false
 
+[functions.wallet-bundle-purchase]
+verify_jwt = false
+
 [functions.africastalking-ussd]
 verify_jwt = false
 
