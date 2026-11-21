@@ -91,3 +91,7 @@ Store publishing cannot be completed from this Windows workspace: Apple archives
 ## Build and publish
 
 Run `npm run build` to produce `dist/`. Publish the repository to your hosting provider (for example Vercel or Netlify), set the two public Supabase environment variables in its project settings, and deploy. Configure the matching production URL in Supabase Auth. Keep live bundle checkout disabled until the secrets, functions, Paystack webhook, and approved non-demo catalogue are configured.
+
+### Admin order complaint provider status refresh
+
+The Admin page keeps complaints in `order_complaints` and loads them through `admin_list_order_complaints()`. The **Refresh API status** button invokes `admin-order-complaint-status-refresh`: Hubnet order complaints are checked against Hubnet's live transaction-status endpoint. DataHub complaints display the latest status synchronized from DataHub's signed webhook callback; the current DataHub integration does not define a separate status polling endpoint. Deploy the function with `npx.cmd supabase functions deploy admin-order-complaint-status-refresh --project-ref <project-ref> --yes`. It uses the configured `HUBNET_BEARER_TOKEN` and optional `HUBNET_API_BASE_URL` Edge Function secrets.

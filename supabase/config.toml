@@ -28,6 +28,9 @@ verify_jwt = false
 [functions.storefront-report-submit]
 verify_jwt = false
 
+[functions.admin-order-complaint-status-refresh]
+verify_jwt = false
+
 [functions.sms-phone-signup-otp]
 verify_jwt = false
 

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { dataHubNetworkKey, hubnetPath, resolveBundleRoute } from "../_shared/bundle-routing.ts";
+import { hubnetReference } from "../_shared/hubnet-reference.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,11 +125,22 @@ Deno.serve(async (request: Request) => {
     if (params.get("action") === "status") {
       const reference = params.get("reference")?.trim() ?? "";
       if (!reference || reference.length > 100) return json(400, { error: "Provide a valid order reference." });
-      let orderQuery = service.from("orders").select("id,bundle_id,recipient_phone,price,status,payment_status,delivery_status,delivery_reference,created_at,delivery_updated_at,bundles(network,size,category,subcategory)").eq("user_id", accountUserId);
-      if (/^[0-9a-f-]{36}$/i.test(reference)) orderQuery = orderQuery.eq("id", reference);
-      else orderQuery = orderQuery.eq("delivery_reference", reference);
-      const { data: order, error } = await orderQuery.maybeSingle();
-      if (error) return json(500, { error: "Could not check this order." });
+      const orderFields = "id,bundle_id,recipient_phone,price,fee_amount,charge_amount,status,payment_status,delivery_status,delivery_provider,payment_reference,delivery_reference,provider_transaction_id,checkout_url,created_at,delivery_updated_at,bundles(network,size,category,subcategory)";
+      const orders = service.from("orders").select(orderFields).eq("user_id", accountUserId);
+      let order: any = null;
+      let error: any = null;
+      if (/^[0-9a-f-]{36}$/i.test(reference)) {
+        ({ data: order, error } = await orders.eq("id", reference).maybeSingle());
+        if (error) return json(500, { error: "Could not check this order." });
+      }
+      if (!order) {
+        ({ data: order, error } = await service.from("orders").select(orderFields).eq("user_id", accountUserId).eq("delivery_reference", reference).maybeSingle());
+        if (error) return json(500, { error: "Could not check this order." });
+      }
+      if (!order) {
+        ({ data: order, error } = await service.from("orders").select(orderFields).eq("user_id", accountUserId).eq("provider_transaction_id", reference).maybeSingle());
+        if (error) return json(500, { error: "Could not check this order." });
+      }
       if (!order) return json(404, { error: "Order not found for this provider account." });
       return json(200, { success: true, order });
     }
@@ -204,6 +216,7 @@ Deno.serve(async (request: Request) => {
 
   const capacity = String(Number((Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1 : 0.001)).toFixed(3)));
   const webhook = `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/hubnet-webhook`;
+  const providerReference = hubnetReference(deliveryReference);
   try {
     let delivery: Response;
     if (activeProvider === "datahub") {
@@ -228,7 +241,7 @@ Deno.serve(async (request: Request) => {
       delivery = await fetch(`${hubnetBase}/live/api/context/business/transaction/${networkKey}`, {
         method: "POST",
         headers: { token: authHeader, "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ phone: body.recipient_phone, volume, reference: deliveryReference, webhook }),
+        body: JSON.stringify({ phone: body.recipient_phone, volume, reference: providerReference, webhook }),
         signal: AbortSignal.timeout(15000),
       });
     }
@@ -259,7 +272,7 @@ Deno.serve(async (request: Request) => {
         // otherwise an order that Hubnet later delivers could be refunded.
         let confirmedStatus: "delivered" | "failed" | "processing" | null = providerStatus;
         if (activeProvider === "hubnet") {
-          try { confirmedStatus = await getHubnetOrderStatus(hubnetBase, hubnetToken!, deliveryReference); }
+          try { confirmedStatus = await getHubnetOrderStatus(hubnetBase, hubnetToken!, providerReference); }
           catch { confirmedStatus = null; }
           if (!confirmedStatus) {
             await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "unknown",

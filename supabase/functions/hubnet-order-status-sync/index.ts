@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hubnetReference } from "../_shared/hubnet-reference.ts";
 
 const headers = {
   "Access-Control-Allow-Origin": "*",
@@ -74,12 +75,14 @@ Deno.serve(async (request: Request) => {
   if (authError || !authData.user) return json(401, { error: "Your session expired. Sign in again." });
 
   const service = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: orders, error } = await service.from("orders")
-    .select("id,delivery_reference,payment_reference")
-    .or(`user_id.eq.${authData.user.id},referred_by_agent_id.eq.${authData.user.id}`)
+  const { data: profile } = await service.from("profiles").select("role").eq("id", authData.user.id).maybeSingle();
+  let ordersQuery = service.from("orders")
+    .select("id,delivery_reference,payment_reference,delivery_status")
     .eq("is_demo", false).eq("payment_status", "successful").eq("delivery_provider", "hubnet")
     .in("delivery_status", ["queued", "processing", "unknown"])
     .order("created_at", { ascending: false }).limit(12);
+  if (profile?.role !== "admin") ordersQuery = ordersQuery.or(`user_id.eq.${authData.user.id},referred_by_agent_id.eq.${authData.user.id}`);
+  const { data: orders, error } = await ordersQuery;
   if (error) return json(500, { error: "Pending Hubnet orders could not be loaded." });
 
   const authHeader = /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
@@ -88,18 +91,27 @@ Deno.serve(async (request: Request) => {
     if (!order.delivery_reference) return;
     try {
       const checkUrl = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
-      checkUrl.searchParams.set("reference", order.delivery_reference);
-      const response = await fetch(checkUrl, {
-        headers: { token: authHeader, Accept: "application/json" },
-        signal: AbortSignal.timeout(7000),
-      });
-      const payload = await response.json().catch(() => null);
+      const candidates = [...new Set([hubnetReference(order.delivery_reference), order.delivery_reference])];
+      let response: Response | null = null;
+      let payload: any = null;
+      for (const candidate of candidates) {
+        checkUrl.searchParams.set("reference", candidate);
+        response = await fetch(checkUrl, {
+          headers: { token: authHeader, Accept: "application/json" },
+          signal: AbortSignal.timeout(7000),
+        });
+        payload = await response.json().catch(() => null);
+        const candidateEnvelope = payload?.response ?? payload;
+        if (response.ok && (candidateEnvelope?.status === true || candidateEnvelope?.status === "success" || payload?.status === true || payload?.status === "success")) break;
+      }
+      if (!response) return;
       const envelope = payload?.response ?? payload;
       const confirmed = envelope?.status === true || envelope?.status === "success" ||
         payload?.status === true || payload?.status === "success";
       if (!response.ok || !confirmed) return;
       const deliveryStatus = extractStatus(payload);
       if (!deliveryStatus) return;
+      if (deliveryStatus === order.delivery_status) return;
       const { error: updateError } = await service.rpc("update_live_order_delivery", {
         p_reference: order.delivery_reference,
         p_delivery_status: deliveryStatus,

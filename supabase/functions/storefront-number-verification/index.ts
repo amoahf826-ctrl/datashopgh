@@ -28,7 +28,13 @@ Deno.serve(async (request: Request) => {
   const anonKey = readKey("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
   const serviceKey = readKey("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
   if (!supabaseUrl || !anonKey || !serviceKey) return json(503, { error: "Number verification is not configured." });
-  if (request.headers.get("apikey") !== anonKey) return json(401, { error: "Invalid request." });
+  // The dedicated DataPlug publishable key is an accepted caller credential.
+  // It is separate from the service-role key, which is only used server-side.
+  const dataplugPublishableKey = Deno.env.get("DATAPLUG_NUMBER_VERIFICATION_API_KEY")?.trim();
+  const suppliedApiKey = request.headers.get("apikey")?.trim() ?? "";
+  if (suppliedApiKey !== anonKey && (!dataplugPublishableKey || suppliedApiKey !== dataplugPublishableKey)) {
+    return json(401, { error: "Invalid request." });
+  }
 
   let body: { phone?: unknown; agent_referral_code?: unknown };
   try { body = await request.json(); } catch { return json(400, { error: "Request body must be JSON." }); }

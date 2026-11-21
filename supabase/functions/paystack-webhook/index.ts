@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { purchaseDataHubVouchers } from "../_shared/datahub-vouchers.ts";
 import { dataHubNetworkKey, hubnetPath, resolveBundleRoute } from "../_shared/bundle-routing.ts";
+import { hubnetReference } from "../_shared/hubnet-reference.ts";
 
 const response = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -260,7 +261,7 @@ Deno.serve(async (request: Request) => {
       delivery = await fetch(endpoint, {
         method: "POST",
         headers: { token: authHeader, "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ phone: claim.phone, volume, reference: claim.delivery_reference, webhook }),
+        body: JSON.stringify({ phone: claim.phone, volume, reference: hubnetReference(claim.delivery_reference), webhook }),
         signal: AbortSignal.timeout(15000),
       });
     }

@@ -147,3 +147,4 @@ img, svg { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+.site-global-footer{width:100%;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:5px;padding:18px 16px;color:#777482;text-align:center;font:500 12px/1.5 'DM Sans',sans-serif}.site-global-footer span{color:#777482}.site-global-footer strong{color:#4c1d95;font-weight:800}

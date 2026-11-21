@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hubnetReference, isHubnetDeliveryReference, isInternalDeliveryReference } from "../_shared/hubnet-reference.ts";
 
 const json = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -55,32 +56,47 @@ Deno.serve(async (request: Request) => {
   let body: any;
   try { body = await request.json(); } catch { return json(400, { error: "Invalid JSON." }); }
   const reference = body?.reference ?? body?.data?.reference ?? body?.transaction?.reference ?? body?.data?.transaction?.reference;
-  if (typeof reference !== "string" || !/^DS[A-Fa-f0-9]{23}$/.test(reference)) return json(400, { error: "Valid order reference is required." });
+  if (typeof reference !== "string" || (!isInternalDeliveryReference(reference) && !isHubnetDeliveryReference(reference))) return json(400, { error: "Valid order reference is required." });
 
   const authHeader = /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
   try {
-    const checkUrl = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
-    checkUrl.searchParams.set("reference", reference);
-    const checked = await fetch(checkUrl, {
-      headers: { token: authHeader, Accept: "application/json" },
-      signal: AbortSignal.timeout(15000),
-    });
-    const result = await checked.json().catch(() => null);
+    const referencesToCheck = isHubnetDeliveryReference(reference) ? [reference] : [hubnetReference(reference), reference];
+    let checked: Response | null = null;
+    let result: any = null;
+    for (const candidate of referencesToCheck) {
+      const checkUrl = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
+      checkUrl.searchParams.set("reference", candidate);
+      checked = await fetch(checkUrl, {
+        headers: { token: authHeader, Accept: "application/json" },
+        signal: AbortSignal.timeout(15000),
+      });
+      result = await checked.json().catch(() => null);
+      const candidateEnvelope = result?.response ?? result;
+      if (checked.ok && (candidateEnvelope?.status === true || candidateEnvelope?.status === "success" || result?.status === true || result?.status === "success")) break;
+    }
+    if (!checked) return json(200, { received: true, verified: false });
     const envelope = result?.response ?? result;
     if (!checked.ok || !(envelope?.status === true || envelope?.status === "success" || result?.status === true || result?.status === "success")) return json(200, { received: true, verified: false });
     const deliveryStatus = extractDeliveryStatus(result);
     if (!deliveryStatus) return json(200, { received: true, verified: false });
 
     const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    let internalReference = reference;
+    if (isHubnetDeliveryReference(reference)) {
+      const { data: matches, error: lookupError } = await service.from("orders")
+        .select("delivery_reference").like("delivery_reference", `${reference}%`).limit(2);
+      if (lookupError || matches?.length !== 1 || !matches[0]?.delivery_reference) return json(200, { received: true, verified: false });
+      internalReference = matches[0].delivery_reference;
+    }
     const { error } = await service.rpc("update_live_order_delivery", {
-      p_reference: reference,
+      p_reference: internalReference,
       p_delivery_status: deliveryStatus,
-      p_provider_transaction_id: envelope?.transaction_id ?? data?.transaction_id ?? null,
+      p_provider_transaction_id: envelope?.transaction_id ?? envelope?.data?.transaction_id ?? null,
     });
     if (error) return json(500, { error: "Verified status could not be saved." });
     if (deliveryStatus === "failed") {
       const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", {
-        p_delivery_reference: reference,
+        p_delivery_reference: internalReference,
       });
       if (refundError) return json(500, { error: "Verified delivery failure was saved, but wallet refund needs reconciliation." });
     }

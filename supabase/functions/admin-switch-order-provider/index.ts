@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hubnetReference } from "../_shared/hubnet-reference.ts";
 
 const headers={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
 const reply=(status:number,data:Record<string,unknown>)=>new Response(JSON.stringify(data),{status,headers});
@@ -27,7 +28,7 @@ Deno.serve(async(request)=>{
     else{
       const path=networkKey==="AT_BIGTIME"?"big-time-new-transaction":networkKey==="TELECEL"?"telecel-new-transaction":networkKey==="AT_PREMIUM"?"at-new-transaction":"mtn-new-transaction";
       const token=/^Bearer\s+/i.test(hubnetToken!)?hubnetToken!:`Bearer ${hubnetToken}`;
-      response=await fetch(`${hubnetBase}/live/api/context/business/transaction/${path}`,{method:"POST",headers:{token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({phone:order.phone,volume:String(Math.round(Number(size[1])*(size[2].toUpperCase()==="GB"?1000:1))),reference:order.reference,webhook:supabaseWebhook}),signal:AbortSignal.timeout(15000)});
+      response=await fetch(`${hubnetBase}/live/api/context/business/transaction/${path}`,{method:"POST",headers:{token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({phone:order.phone,volume:String(Math.round(Number(size[1])*(size[2].toUpperCase()==="GB"?1000:1))),reference:hubnetReference(order.reference),webhook:supabaseWebhook}),signal:AbortSignal.timeout(15000)});
     }
     const raw=await response.json().catch(()=>null),envelope=provider==="hubnet"?(raw?.response??raw):raw,data=envelope?.data??raw?.data??{},accepted=provider==="hubnet"?(envelope?.status===true||envelope?.status==="success"||raw?.success===true||raw?.status==="success"):raw?.success===true;
     if(response.ok&&accepted&&(provider==="hubnet"||typeof data.reference==="string")){
