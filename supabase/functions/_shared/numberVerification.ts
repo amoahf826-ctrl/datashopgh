@@ -1,7 +1,10 @@
 type VerificationStatus = 'verified' | 'unverified' | 'queued' | 'invalid';
-type VerificationResult = { status: VerificationStatus; provider: 'datahub' | 'hubnet' } | { error: string };
+type VerificationResult = { status: VerificationStatus; provider: 'datahub' | 'hubnet' } | { status: 'not_required' } | { error: string };
 
-export async function verifyConfiguredNumber(service: any, phone: string): Promise<VerificationResult> {
+export async function verifyConfiguredNumber(service: any, phone: string, network?: string): Promise<VerificationResult> {
+  // The configured verification integrations currently verify MTN numbers only.
+  // Do not send Telecel/AT recipients to an MTN-only endpoint and block checkout.
+  if (network && !/\bmtn\b/i.test(network)) return { status: 'not_required' };
   const { data: setting, error: settingError } = await service.from('platform_settings')
     .select('value').eq('key', 'number_verification_provider').maybeSingle();
   if (settingError) return { error: 'Could not load the number verification service.' };

@@ -80,24 +80,31 @@ Deno.serve(async (request: Request) => {
     .select("value").eq("key", "storefront_live_sales").maybeSingle();
   if (settingError || setting?.value?.enabled !== true) return json(503, { error: "Live checkout is not enabled yet." });
 
-  const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-real-ip") ??
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const verificationHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${ip}|${referralCode || "main-store"}`));
-  const verificationRateKey = `number-verification:${Array.from(new Uint8Array(verificationHash)).map(value => value.toString(16).padStart(2, "0")).join("")}`;
-  const { data: verificationAllowed, error: verificationRateError } = await service.rpc("consume_public_number_verification_rate_limit", {
-    p_rate_key: verificationRateKey, p_limit: 10,
-  });
-  if (verificationRateError) return json(503, { error: "Number verification is temporarily unavailable. No payment was started." });
-  if (verificationAllowed !== true) return json(429, { error: "Too many number checks. Please wait a few minutes and try again. No payment was started." });
-  const numberCheck = await verifyConfiguredNumber(service, body.recipient_phone);
-  if ("error" in numberCheck) return json(502, { error: `${numberCheck.error} No payment was started.` });
-  if (numberCheck.status !== "verified") {
-    const reason = numberCheck.status === "unverified"
-      ? "Phone Number is Not Verified. You can't buy Data Now.Check again Next Week untill your Number is Verified."
-      : numberCheck.status === "queued"
-        ? "Number verification is still processing. Please try again in a moment."
-        : "This phone number could not be verified. Check the number and try again.";
-    return json(422, { error: `${reason} No payment was started.`, verification_status: numberCheck.status });
+  const { data: bundle, error: bundleError } = await service.from("bundles")
+    .select("network,is_active,is_demo").eq("id", body.bundle_id).maybeSingle();
+  if (bundleError) return json(503, { error: "Could not confirm this data plan. Please try again." });
+  if (!bundle?.is_active || bundle.is_demo) return json(400, { error: "This data plan is unavailable." });
+
+  if (/\bmtn\b/i.test(String(bundle.network ?? ""))) {
+    const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-real-ip") ??
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    const verificationHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${ip}|${referralCode || "main-store"}`));
+    const verificationRateKey = `number-verification:${Array.from(new Uint8Array(verificationHash)).map(value => value.toString(16).padStart(2, "0")).join("")}`;
+    const { data: verificationAllowed, error: verificationRateError } = await service.rpc("consume_public_number_verification_rate_limit", {
+      p_rate_key: verificationRateKey, p_limit: 10,
+    });
+    if (verificationRateError) return json(503, { error: "Number verification is temporarily unavailable. No payment was started." });
+    if (verificationAllowed !== true) return json(429, { error: "Too many number checks. Please wait a few minutes and try again. No payment was started." });
+    const numberCheck = await verifyConfiguredNumber(service, body.recipient_phone, String(bundle.network));
+    if ("error" in numberCheck) return json(502, { error: `${numberCheck.error} No payment was started.` });
+    if (numberCheck.status !== "verified") {
+      const reason = numberCheck.status === "unverified"
+        ? "Phone Number is Not Verified. You can't buy Data Now.Check again Next Week untill your Number is Verified."
+        : numberCheck.status === "queued"
+          ? "Number verification is still processing. Please try again in a moment."
+          : "This phone number could not be verified. Check the number and try again.";
+      return json(422, { error: `${reason} No payment was started.`, verification_status: numberCheck.status });
+    }
   }
 
   const orderId = crypto.randomUUID();
