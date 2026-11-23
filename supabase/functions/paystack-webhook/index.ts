@@ -21,6 +21,13 @@ function hubnetExplicitlyRejected(payload: any): boolean {
     ["failed", "failure", "rejected", "error"].includes(status);
 }
 
+function dataHubExplicitlyRejected(payload: any): boolean {
+  const envelope = payload?.response ?? payload;
+  const status = String(envelope?.status ?? payload?.status ?? "").trim().toLowerCase();
+  return envelope?.success === false || payload?.success === false || envelope?.status === false || payload?.status === false ||
+    ["failed", "failure", "rejected", "error"].includes(status);
+}
+
 function readSupabaseServiceKey(): string | undefined {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
   if (legacy) return legacy;
@@ -268,25 +275,25 @@ Deno.serve(async (request: Request) => {
     const result = await delivery.json().catch(() => null);
     const envelope = activeProvider === "hubnet" ? (result?.response ?? result) : result;
     const resultData = envelope?.data ?? result?.data ?? {};
+    const providerReference = resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? resultData.transactionReference;
     const accepted = activeProvider === "hubnet"
       ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
       : result?.success === true;
     const providerStatus = normalizeDeliveryStatus(resultData.status ?? resultData.delivery_status ?? resultData.orderStatus ?? resultData.order_status);
-    if (activeProvider === "hubnet" && delivery.ok && !accepted && hubnetExplicitlyRejected(result)) {
+    if (delivery.ok && !accepted && (activeProvider === "hubnet" ? hubnetExplicitlyRejected(result) : dataHubExplicitlyRejected(result))) {
       const reason = String(envelope?.message ?? result?.message ?? result?.error ?? resultData?.message ?? "")
         .replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
-      console.error("Hubnet rejected paid delivery", { reference: claim.delivery_reference, networkKey, httpStatus: delivery.status, reason });
+      console.error(`${activeProvider} rejected paid delivery`, { reference: claim.delivery_reference, networkKey, httpStatus: delivery.status, reason });
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,
         p_delivery_status: "failed",
-        p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? claim.delivery_reference,
+        p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null,
       });
-    } else if (delivery.ok && accepted && (providerStatus === "failed" || activeProvider === "hubnet" || typeof resultData.reference === "string")) {
-      const transactionReference = resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? claim.delivery_reference;
+    } else if (delivery.ok && accepted && (providerStatus === "failed" || activeProvider === "hubnet" || typeof providerReference === "string")) {
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,
         p_delivery_status: providerStatus ?? "unknown",
-        p_provider_transaction_id: transactionReference,
+        p_provider_transaction_id: typeof providerReference === "string" ? providerReference : (activeProvider === "hubnet" ? claim.delivery_reference : null),
       });
     } else if (delivery.ok && result?.success === true) {
       await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "unknown" });

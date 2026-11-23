@@ -255,18 +255,19 @@ Deno.serve(async (request: Request) => {
     const result = await delivery.json().catch(() => null);
     const envelope = activeProvider === "hubnet" ? (result?.response ?? result) : result;
     const resultData = envelope?.data ?? result?.data ?? {};
+    const providerReference = resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? resultData.transactionReference;
     const accepted = activeProvider === "hubnet"
       ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
       : result?.success === true;
     const providerStatus = normalizeDeliveryStatus(resultData.status ?? resultData.delivery_status ?? resultData.orderStatus ?? resultData.order_status);
-    if (activeProvider === "datahub" && delivery.ok && !accepted && dataHubExplicitlyRejected(result)) {
+    if (activeProvider === "datahub" && !accepted && dataHubExplicitlyRejected(result)) {
       const reason = String(envelope?.message ?? result?.message ?? result?.error ?? resultData?.message ?? "")
         .replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
       console.error("DataHub rejected wallet delivery", { reference: deliveryReference, networkType, httpStatus: delivery.status, reason });
       await service.rpc("update_live_order_delivery", {
         p_reference: deliveryReference,
         p_delivery_status: "failed",
-        p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference,
+        p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null,
       });
       const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
       return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
@@ -279,13 +280,13 @@ Deno.serve(async (request: Request) => {
       await service.rpc("update_live_order_delivery", {
         p_reference: deliveryReference,
         p_delivery_status: "failed",
-        p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference,
+        p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null,
       });
       const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
       return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
         message: refundError ? "The order was rejected. Contact support to reconcile your wallet." : `The order was rejected${reason ? `: ${reason}` : ""}. Your wallet has been refunded.` });
     }
-    if (delivery.ok && accepted && (activeProvider === "hubnet" || typeof resultData.reference === "string")) {
+    if (delivery.ok && accepted && (activeProvider === "hubnet" || typeof providerReference === "string")) {
       if (providerStatus === "failed") {
         // Hubnet's purchase response can report a transient/ambiguous status.
         // Confirm it against the transaction-status endpoint before refunding;
@@ -296,19 +297,19 @@ Deno.serve(async (request: Request) => {
           catch { confirmedStatus = null; }
           if (!confirmedStatus) {
             await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "unknown",
-              p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference });
+              p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null });
             return json(200, { success: true, ...order, delivery_status: "unknown",
               message: "Hubnet accepted the order, but its final status is not confirmed yet. Please check order history shortly." });
           }
           if (confirmedStatus !== "failed") {
             await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: confirmedStatus,
-              p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference });
+              p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null });
             return json(200, { success: true, ...order, delivery_status: confirmedStatus,
               message: confirmedStatus === "delivered" ? "Data delivered successfully." : "Hubnet is processing the order." });
           }
         }
         await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "failed",
-          p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference });
+          p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null });
         const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
         const providerReason = String(resultData.message ?? result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
         return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
@@ -317,7 +318,7 @@ Deno.serve(async (request: Request) => {
       const deliveryStatus = providerStatus ?? "unknown";
       await service.rpc("update_live_order_delivery", {
         p_reference: deliveryReference, p_delivery_status: deliveryStatus,
-        p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference,
+        p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null,
       });
       return json(200, { success: true, ...order, delivery_status: deliveryStatus,
         message: deliveryStatus === "delivered" ? "Data delivered successfully."

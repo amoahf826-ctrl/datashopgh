@@ -74,17 +74,23 @@ Deno.serve(async (request) => {
       const payload = await response.json().catch(() => null);
       const data = payload?.data ?? {};
       const accepted = response.ok && payload?.success === true;
-      const providerReference = data.reference ?? data.transaction_id ?? data.tracking_id;
+      const providerReference = data.reference ?? data.transaction_id ?? data.tracking_id ?? data.transactionReference;
       if (!accepted) {
-        const definiteRejection = response.status >= 400 && response.status < 500 || payload?.success === false || payload?.status === false;
+        const responseStatus = String(payload?.status ?? payload?.data?.status ?? "").trim().toLowerCase();
+        const definiteRejection = response.status >= 400 && response.status < 500 || payload?.success === false || payload?.status === false ||
+          ["failed", "failure", "rejected", "error"].includes(responseStatus);
         if (!definiteRejection) {
           await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "unknown" });
           outcomes.push({ order_id: orderId, success: true, delivery_status: "unknown", message: "DataHub response was ambiguous; wallet debit retained. Reconcile with DataHub before another attempt." });
           continue;
         }
-        await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "failed",
+        const { error: statusError } = await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "failed",
           p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null });
-        const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
+        if (statusError) {
+          outcomes.push({ order_id: orderId, success: false, error: "DataHub rejected the retry, but its failed status could not be saved. Reconcile this order before taking another action." });
+          continue;
+        }
+        const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
         outcomes.push({ order_id: orderId, success: false, delivery_status: "failed",
           message: refundError ? "DataHub rejected the order; automatic wallet refund needs admin review." : "DataHub rejected the retry and the wallet debit was refunded." });
         continue;
@@ -95,8 +101,12 @@ Deno.serve(async (request) => {
         continue;
       }
       const deliveryStatus = statusOf(data.status ?? data.delivery_status ?? data.orderStatus ?? data.order_status) ?? "processing";
-      await service.rpc("update_live_order_delivery", { p_reference: newReference,
+      const { error: statusError } = await service.rpc("update_live_order_delivery", { p_reference: newReference,
         p_delivery_status: deliveryStatus, p_provider_transaction_id: providerReference });
+      if (statusError) {
+        outcomes.push({ order_id: orderId, success: false, error: "DataHub responded, but the new order status could not be saved. Reconcile this order with DataHub before retrying." });
+        continue;
+      }
       if (deliveryStatus === "failed") {
         const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
         outcomes.push({ order_id: orderId, success: false, delivery_status: "failed",

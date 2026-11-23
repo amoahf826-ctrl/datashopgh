@@ -31,9 +31,10 @@ Deno.serve(async(request)=>{
       response=await fetch(`${hubnetBase}/live/api/context/business/transaction/${path}`,{method:"POST",headers:{token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({phone:order.phone,volume:String(Math.round(Number(size[1])*(size[2].toUpperCase()==="GB"?1000:1))),reference:hubnetReference(order.reference),webhook:supabaseWebhook}),signal:AbortSignal.timeout(15000)});
     }
     const raw=await response.json().catch(()=>null),envelope=provider==="hubnet"?(raw?.response??raw):raw,data=envelope?.data??raw?.data??{},accepted=provider==="hubnet"?(envelope?.status===true||envelope?.status==="success"||raw?.success===true||raw?.status==="success"):raw?.success===true;
-    if(response.ok&&accepted&&(provider==="hubnet"||typeof data.reference==="string")){
+    const providerReference=data.reference??data.transaction_id??data.tracking_id??data.transactionReference;
+    if(response.ok&&accepted&&(provider==="hubnet"||typeof providerReference==="string")){
       const status=normalize(data.status??data.delivery_status??data.orderStatus??data.order_status)??"processing";
-      const {error}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:status,p_provider_transaction_id:data.reference??data.transaction_id??data.tracking_id??order.reference});
+      const {error}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:status,p_provider_transaction_id:typeof providerReference==="string"?providerReference:(provider==="hubnet"?order.reference:null)});
       if(error)return reply(500,{error:"Provider accepted the retry, but order status could not be saved. Check the order status before retrying again."});
       return reply(200,{success:true,delivery_status:status});
     }

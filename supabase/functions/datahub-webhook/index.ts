@@ -19,6 +19,16 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+function callbackTimestamp(event: any, request: Request): number {
+  const value = String(event?.timestamp ?? request.headers.get("X-Webhook-Timestamp") ?? "").trim();
+  if (!value) return Number.NaN;
+  if (/^\d+(?:\.\d+)?$/.test(value)) {
+    const numeric = Number(value);
+    return numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+  }
+  return Date.parse(value);
+}
+
 async function validSignature(secret: string, rawBody: Uint8Array, request: Request): Promise<boolean> {
   const signature = request.headers.get("X-Webhook-Signature")?.trim() ?? "";
   if (!/^[a-f0-9]{64}$/i.test(signature)) return false;
@@ -50,12 +60,17 @@ Deno.serve(async (request: Request) => {
   const rawBody = new TextDecoder().decode(rawBodyBytes);
   let event: any;
   try { event = JSON.parse(rawBody); } catch { return reply(400, { error: "Invalid JSON." }); }
-  const signatureAuthorized = await validSignature(expectedToken, rawBodyBytes, request).catch(() => false);
-  if (!signatureAuthorized) {
+  const urlToken = new URL(request.url).searchParams.get("token") ?? "";
+  const urlTokenAuthorized = constantTimeEqual(urlToken, expectedToken);
+  const signatureAuthorized = request.headers.has("X-Webhook-Signature")
+    ? await validSignature(expectedToken, rawBodyBytes, request).catch(() => false)
+    : false;
+  if (!urlTokenAuthorized && !signatureAuthorized) {
     console.warn("DataHub webhook authentication failed", {
+      queryTokenPresent: !!urlToken,
       expectedHeaderPresent: request.headers.has("X-Webhook-Signature"),
     });
-    return reply(401, { error: "Webhook signature is missing or invalid. Verify the HMAC secret and raw-body SHA-256 hex signature." });
+    return reply(401, { error: "Webhook authentication failed. Configure the secret callback URL token or a valid HMAC signature." });
   }
 
   const eventType = String(event?.event ?? request.headers.get("X-Webhook-Event") ?? "").trim();
@@ -74,10 +89,10 @@ Deno.serve(async (request: Request) => {
     return reply(400, { error: "Invalid DataHub order status event." });
   }
 
-  // DataHub's guide guarantees the event and timestamp in the JSON payload,
-  // and the HMAC in X-Webhook-Signature. It does not require separate event or
-  // timestamp headers, so don't reject otherwise valid deliveries for lacking them.
-  const payloadTimestamp = Date.parse(String(event.timestamp ?? ""));
+  // Accept the documented secret callback URL token and either a timestamp in
+  // the payload or X-Webhook-Timestamp. HMAC remains supported when configured
+  // by the provider, but is not required for the secret-URL callback flow.
+  const payloadTimestamp = callbackTimestamp(event, request);
   if (Number.isFinite(payloadTimestamp) && Math.abs(Date.now() - payloadTimestamp) > 10 * 60 * 1000) {
     return reply(401, { error: "Webhook timestamp is expired." });
   }
