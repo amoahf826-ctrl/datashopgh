@@ -7,6 +7,9 @@ verify_jwt = false
 [functions.datahub-webhook]
 verify_jwt = false
 
+[functions.datahub-order-status-sync]
+verify_jwt = false
+
 [functions.public-track-order]
 verify_jwt = false
 

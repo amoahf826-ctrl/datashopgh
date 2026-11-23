@@ -77,18 +77,21 @@ Deno.serve(async (request: Request) => {
   const service = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: profile } = await service.from("profiles").select("role").eq("id", authData.user.id).maybeSingle();
   let ordersQuery = service.from("orders")
-    .select("id,delivery_reference,payment_reference,delivery_status")
+    .select("id,delivery_reference,payment_reference,delivery_status,last_provider_status_checked_at")
     .eq("is_demo", false).eq("payment_status", "successful").eq("delivery_provider", "hubnet")
     .in("delivery_status", ["queued", "processing", "unknown"])
-    .order("created_at", { ascending: false }).limit(12);
+    .order("last_provider_status_checked_at", { ascending: true, nullsFirst: true }).limit(40);
   if (profile?.role !== "admin") ordersQuery = ordersQuery.or(`user_id.eq.${authData.user.id},referred_by_agent_id.eq.${authData.user.id}`);
   const { data: orders, error } = await ordersQuery;
   if (error) return json(500, { error: "Pending Hubnet orders could not be loaded." });
 
   const authHeader = /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
   let updated = 0;
-  await Promise.all((orders ?? []).map(async (order) => {
-    if (!order.delivery_reference) return;
+  const queue = [...(orders ?? [])];
+  const workers = Array.from({ length: Math.min(8, queue.length) }, async () => {
+   while (queue.length) {
+    const order = queue.shift()!;
+    if (!order.delivery_reference) continue;
     try {
       const checkUrl = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
       const candidates = [...new Set([hubnetReference(order.delivery_reference), order.delivery_reference])];
@@ -123,6 +126,11 @@ Deno.serve(async (request: Request) => {
       }
       updated++;
     } catch { /* Leave an unresolved order untouched; a later refresh can check again. */ }
-  }));
+    finally {
+      await service.from("orders").update({ last_provider_status_checked_at: new Date().toISOString() }).eq("id", order.id);
+    }
+   }
+  });
+  await Promise.all(workers);
   return json(200, { success: true, checked: orders?.length ?? 0, updated });
 });
