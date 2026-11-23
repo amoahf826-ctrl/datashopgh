@@ -51,7 +51,61 @@ export default function AdminPanel({client,notify,onLogout,onAfaPlansChanged,onS
   }
   setLoading(false);
  }void load();return()=>{live=false}},[client,refresh,notify,section]);
- useEffect(()=>{let live=true;async function load(){if(!['customers','orders','deposits','ledger','audit'].includes(section))return;const table=section==='customers'?'profiles':section==='orders'?'orders':section==='deposits'?'deposits':section==='ledger'?'ledger':'audit_log';let query=client.from(table).select(section==='orders'?'*,bundles(size,network,category,subcategory)':'*').order('created_at',{ascending:false});if(section==='orders'){if(orderDates.start)query=query.gte('created_at',new Date(`${orderDates.start}T00:00:00`).toISOString());if(orderDates.end)query=query.lte('created_at',new Date(`${orderDates.end}T23:59:59.999`).toISOString())}const {data,error}=await query.limit(section==='orders'?1000:50);if(!live)return;if(error){notify(`Unable to load ${section}.`);setRows([])}else if(section==='orders'){const orderRows=data??[];const agentIds=[...new Set(orderRows.flatMap((order:Row)=>[order.referred_by_agent_id,order.user_id]).filter(Boolean).map(String))];if(agentIds.length){const {data:agents}=await client.from('agent_accounts').select('user_id,referral_code,username,business_name').in('user_id',agentIds);const {data:profiles}=await client.from('profiles').select('id,email,full_name').in('id',agentIds);if(!live)return;const profilesById=new Map((profiles??[]).map((profile:Row)=>[String(profile.id),profile]));const agentsById=new Map((agents??[]).map((agent:Row)=>[String(agent.user_id),agent]));setRows(orderRows.map((order:Row)=>{const referralId=String(order.referred_by_agent_id??'');const buyerId=String(order.user_id??'');const isAgentBuyer=!referralId&&agentsById.has(buyerId);const id=referralId|| (isAgentBuyer?buyerId:'');const profile=profilesById.get(id);const agent=agentsById.get(id);return {...order,bundle:Array.isArray(order.bundles)?order.bundles[0]??null:order.bundles??null,agent_name:profile?.full_name||agent?.business_name||agent?.username||null,agent_email:profile?.email??null,agent_label:profile?.full_name||profile?.email||agent?.referral_code||null,order_source:isAgentBuyer?'Agent Dashboard':'Storefront'}}))}else setRows(orderRows.map((order:Row)=>({...order,bundle:Array.isArray(order.bundles)?order.bundles[0]??null:order.bundles??null,order_source:'Storefront'})))}else setRows(data??[])}void load();return()=>{live=false}},[client,section,refresh,notify,orderDates]);
+ useEffect(()=>{
+  let live=true;
+  async function load(){
+   if(!['customers','orders','deposits','ledger','audit'].includes(section))return;
+   const table=section==='customers'?'profiles':section==='orders'?'orders':section==='deposits'?'deposits':section==='ledger'?'ledger':'audit_log';
+   let query=client.from(table).select(section==='orders'?'*,bundles(size,network,category,subcategory)':'*').order('created_at',{ascending:false});
+   if(section==='orders'){
+    if(orderDates.start)query=query.gte('created_at',new Date(`${orderDates.start}T00:00:00`).toISOString());
+    if(orderDates.end)query=query.lte('created_at',new Date(`${orderDates.end}T23:59:59.999`).toISOString());
+   }
+   const {data,error}=await query.limit(section==='orders'?1000:50);
+   if(!live)return;
+   if(error){notify(`Unable to load ${section}.`);setRows([]);return}
+   const orderRows=data??[];
+   if(section!=='orders'){setRows(orderRows);return}
+
+   // Older checkout adapters wrote agent attribution to the audit record before
+   // every production database had the referral column populated consistently.
+   const missingReferralOrders=orderRows.filter((order:Row)=>!order.referred_by_agent_id).map((order:Row)=>String(order.id));
+   const auditAgentByOrder=new Map<string,string>();
+   for(let offset=0;offset<missingReferralOrders.length;offset+=100){
+    const batch=missingReferralOrders.slice(offset,offset+100);
+    const {data:auditRows}=await client.from('audit_log').select('entity_id,details').eq('entity','order').in('entity_id',batch).order('created_at',{ascending:false});
+    for(const event of auditRows??[]){
+     const details=event.details&&typeof event.details==='object'?event.details as Record<string,unknown>:{};
+     const agentId=typeof details.agent_id==='string'?details.agent_id:'';
+     if(agentId&&!auditAgentByOrder.has(String(event.entity_id)))auditAgentByOrder.set(String(event.entity_id),agentId);
+    }
+   }
+   const agentIds=[...new Set(orderRows.flatMap((order:Row)=>[order.referred_by_agent_id,auditAgentByOrder.get(String(order.id)),order.user_id]).filter(Boolean).map(String))];
+   if(!agentIds.length){setRows(orderRows.map((order:Row)=>({...order,bundle:Array.isArray(order.bundles)?order.bundles[0]??null:order.bundles??null,order_source:'Storefront'})));return}
+   const [{data:agents},{data:profiles}]=await Promise.all([
+    client.from('agent_accounts').select('user_id,referral_code,username,business_name').in('user_id',agentIds),
+    client.from('profiles').select('id,email,full_name').in('id',agentIds),
+   ]);
+   if(!live)return;
+   const profilesById=new Map((profiles??[]).map((profile:Row)=>[String(profile.id),profile]));
+   const agentsById=new Map((agents??[]).map((agent:Row)=>[String(agent.user_id),agent]));
+   setRows(orderRows.map((order:Row)=>{
+    const referralId=String(order.referred_by_agent_id??auditAgentByOrder.get(String(order.id))??'');
+    const buyerId=String(order.user_id??'');
+    const isAgentBuyer=!referralId&&agentsById.has(buyerId);
+    const id=referralId||(isAgentBuyer?buyerId:'');
+    const profile=profilesById.get(id);
+    const agent=agentsById.get(id);
+    return {...order,bundle:Array.isArray(order.bundles)?order.bundles[0]??null:order.bundles??null,
+     agent_name:profile?.full_name||agent?.business_name||agent?.username||profile?.email||null,
+     agent_email:profile?.email??null,
+     agent_label:profile?.full_name||profile?.email||agent?.business_name||agent?.username||agent?.referral_code||null,
+     order_source:isAgentBuyer?'Agent Dashboard':'Storefront'};
+   }));
+  }
+  void load();
+  return()=>{live=false};
+ },[client,section,refresh,notify,orderDates]);
  useEffect(()=>{let live=true;if(section!=='orders')return()=>{live=false};void(async()=>{const results=await Promise.all([client.functions.invoke('hubnet-order-status-sync',{body:{}}),client.functions.invoke('datahub-order-status-sync',{body:{}})]);if(live&&results.some(({data,error})=>!error&&Number(data?.updated)>0))setRefresh(value=>value+1)})();return()=>{live=false}},[client,section,refresh]);
  useEffect(()=>{let live=true;async function loadRefunds(){if(section!=='orders')return;const {data,error}=await client.from('ledger').select('reference_id').eq('kind','refund').eq('reference_type','order').limit(5000);if(!live)return;if(error){notify('Refunded order counts could not be loaded.');setRefundedOrderIds([])}else setRefundedOrderIds((data??[]).map(item=>String(item.reference_id)))}void loadRefunds();return()=>{live=false}},[client,section,refresh,notify]);
  async function toggle(table:'networks'|'bundles',id:string,active:boolean){const {error}=await client.from(table).update({is_active:!active}).eq('id',id);if(error){notify('Update was rejected by the database.');return}notify('Availability updated.');setRefresh(v=>v+1)}
