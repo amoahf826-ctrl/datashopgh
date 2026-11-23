@@ -208,7 +208,7 @@ function StatusOrderPanel({title,status,orders,loading,refundedOrderIds=[],clien
   if(!window.confirm(`Retry this paid wallet order once through DataHub? This will not debit the wallet again. The order was not visible in your DataHub dashboard. If DataHub accepted the original request but its dashboard is delayed, this retry could deliver a duplicate bundle.`))return;
   const {data,error}=await client.functions.invoke('admin-retry-unknown-datahub-wallet-order',{body:{order_ids:[order.id]}});
   const result=data?.results?.[0];
-  if(error||!result?.success){onNotice(result?.error??result?.message??data?.error??error?.message??'Could not retry this order through DataHub.');onRefresh();return}
+  if(error||!result?.success){let serverError='';try{const context=(error as any)?.context;if(context&&typeof context.clone==='function'){const response=context.clone();const payload=await response.json().catch(()=>null);serverError=String(payload?.error??payload?.message??'')}}catch{}onNotice(result?.error||result?.message||data?.error||serverError||error?.message||'Could not retry this order through DataHub.');onRefresh();return}
   onNotice(result.message??`DataHub retry submitted. Status: ${result.delivery_status??'unknown'}.`);onRefresh();
  }
  return <section className="admin-card admin-status-orders">
