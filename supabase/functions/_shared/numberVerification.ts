@@ -5,11 +5,16 @@ function providerText(payload: any): string {
   try { return JSON.stringify(payload).toLowerCase(); } catch { return ''; }
 }
 
+async function readPayload(response: Response): Promise<any> {
+  const body = await response.text().catch(() => '');
+  try { return JSON.parse(body); } catch { return { message: body }; }
+}
+
 function providerSaysUnverified(payload: any): boolean {
   const text = providerText(payload);
   return payload?.data?.verified === false || payload?.data?.exists === false ||
     payload?.response?.data?.verified === false || payload?.response?.data?.exists === false ||
-    /unverified|not verified|not added to.{0,60}beneficiar|not on.{0,40}beneficiar|new beneficiar.{0,40}detected|orders?.{0,50}(?:blocked|currently blocked)|beneficiar.{0,80}(?:blocked|not on)/i.test(text);
+    /unverified|not[_\s-]?verified|not added.{0,60}beneficiar|not on.{0,60}beneficiar|new beneficiar.{0,60}detected|orders?.{0,60}(?:blocked|currently blocked)|beneficiar.{0,80}(?:blocked|not on)|please use a verified number/i.test(text);
 }
 
 export async function verifyConfiguredNumber(service: any, phone: string, network?: string): Promise<VerificationResult> {
@@ -29,7 +34,7 @@ export async function verifyConfiguredNumber(service: any, phone: string, networ
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey, Accept: 'application/json' },
         body: JSON.stringify({ phone, is_ported_number: true }), signal: AbortSignal.timeout(20000),
       });
-      const payload = await response.json().catch(() => null);
+      const payload = await readPayload(response);
       const envelope = payload?.response ?? payload;
       const data = envelope?.data ?? payload?.data ?? {};
       const status = String(data?.verification_status ?? data?.status ?? '').toLowerCase();
@@ -50,7 +55,7 @@ export async function verifyConfiguredNumber(service: any, phone: string, networ
     const endpoint = new URL(`${apiBase}/live/api/context/business/transaction/mtn-verification`);
     endpoint.searchParams.set('number', phone);
     const response = await fetch(endpoint, { method: 'GET', headers: { token: /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`, Accept: 'application/json' }, signal: AbortSignal.timeout(12000) });
-    const payload = await response.json().catch(() => null);
+    const payload = await readPayload(response);
     const envelope = payload?.response ?? payload;
     const data = envelope?.data ?? payload?.data;
     const status = String(data?.verification_status ?? data?.status ?? '').toLowerCase();

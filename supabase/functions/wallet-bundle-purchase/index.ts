@@ -44,6 +44,12 @@ function dataHubExplicitlyRejected(payload: any): boolean {
     ["failed", "failure", "rejected", "error"].includes(status);
 }
 
+function providerIndicatesUnverified(...payloads: unknown[]): boolean {
+  let text = "";
+  try { text = JSON.stringify(payloads).toLowerCase(); } catch { return false; }
+  return /unverified|not[_\s-]?verified|not added.{0,60}beneficiar|not on.{0,60}beneficiar|new beneficiar.{0,60}detected|orders?.{0,60}blocked|please use a verified number/i.test(text);
+}
+
 async function getHubnetOrderStatus(base: string, token: string, reference: string) {
   const url = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
   url.searchParams.set("reference", reference);
@@ -340,7 +346,9 @@ Deno.serve(async (request: Request) => {
           p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null });
         const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
         const providerReason = String(resultData.message ?? result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
+        const unverifiedNumber = providerIndicatesUnverified(resultData, result);
         return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
+          ...(unverifiedNumber ? { verification_status: "unverified" } : {}),
           message: refundError ? "The provider reported a failed delivery. Contact support to reconcile your wallet." : `Delivery failed${providerReason ? `: ${providerReason}` : ""}. Your wallet has been refunded.` });
       }
       const deliveryStatus = providerStatus ?? "unknown";
@@ -361,8 +369,10 @@ Deno.serve(async (request: Request) => {
       const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", {
         p_delivery_reference: deliveryReference,
       });
+      const unverifiedNumber = providerIndicatesUnverified(result);
       return json(200, { success: true, ...order, delivery_status: "failed",
         wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
+        ...(unverifiedNumber ? { verification_status: "unverified" } : {}),
         message: refundError ? "The provider rejected delivery. Contact support to reconcile your wallet." : `Delivery was rejected${String(result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim() ? `: ${String(result?.message ?? result?.error).replace(/[<>\r\n]+/g, " ").trim().slice(0, 180)}` : ""}. Your wallet has been refunded.` });
     }
 
