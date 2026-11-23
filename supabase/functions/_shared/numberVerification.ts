@@ -1,6 +1,17 @@
 type VerificationStatus = 'verified' | 'unverified' | 'queued' | 'invalid';
 type VerificationResult = { status: VerificationStatus; provider: 'datahub' | 'hubnet' } | { status: 'not_required' } | { error: string };
 
+function providerText(payload: any): string {
+  try { return JSON.stringify(payload).toLowerCase(); } catch { return ''; }
+}
+
+function providerSaysUnverified(payload: any): boolean {
+  const text = providerText(payload);
+  return payload?.data?.verified === false || payload?.data?.exists === false ||
+    payload?.response?.data?.verified === false || payload?.response?.data?.exists === false ||
+    /unverified|not verified|not added to.{0,60}beneficiar|not on.{0,40}beneficiar|new beneficiar.{0,40}detected|orders?.{0,50}(?:blocked|currently blocked)|beneficiar.{0,80}(?:blocked|not on)/i.test(text);
+}
+
 export async function verifyConfiguredNumber(service: any, phone: string, network?: string): Promise<VerificationResult> {
   // The configured verification integrations currently verify MTN numbers only.
   // Do not send Telecel/AT recipients to an MTN-only endpoint and block checkout.
@@ -19,9 +30,14 @@ export async function verifyConfiguredNumber(service: any, phone: string, networ
         body: JSON.stringify({ phone, is_ported_number: true }), signal: AbortSignal.timeout(20000),
       });
       const payload = await response.json().catch(() => null);
-      const message = String(payload?.error ?? payload?.message ?? '');
-      if (response.ok && payload?.success === true && (payload?.data?.verified === true || payload?.data?.exists === true)) return { status: 'verified', provider };
-      if ((response.ok || response.status === 400) && (payload?.data?.verified === false || payload?.data?.exists === false || /phone number not verified|not added to.*beneficiar/i.test(message))) return { status: 'unverified', provider };
+      const envelope = payload?.response ?? payload;
+      const data = envelope?.data ?? payload?.data ?? {};
+      const status = String(data?.verification_status ?? data?.status ?? '').toLowerCase();
+      if (providerSaysUnverified(payload)) return { status: 'unverified', provider };
+      if (response.ok && (payload?.success === true || envelope?.success === true) &&
+          (data?.verified === true || data?.exists === true || status === 'verified')) return { status: 'verified', provider };
+      if ((response.ok || response.status === 400) && ['unverified', 'not_verified'].includes(status)) return { status: 'unverified', provider };
+      if ((response.ok || response.status === 400) && ['invalid', 'queued'].includes(status)) return { status: status as 'invalid' | 'queued', provider };
       if (response.status === 400 && payload?.success === false) return { status: 'invalid', provider };
       return { error: 'Number verification is temporarily unavailable. Please try again.' };
     }
@@ -37,8 +53,9 @@ export async function verifyConfiguredNumber(service: any, phone: string, networ
     const payload = await response.json().catch(() => null);
     const envelope = payload?.response ?? payload;
     const data = envelope?.data ?? payload?.data;
-    const status = String(data?.status ?? '').toLowerCase();
+    const status = String(data?.verification_status ?? data?.status ?? '').toLowerCase();
     const ok = envelope?.status === true || envelope?.status === 'success' || payload?.status === true || payload?.status === 'success';
+    if (providerSaysUnverified(payload) || status === 'unverified' || status === 'not_verified') return { status: 'unverified', provider };
     if (!response.ok || !ok || !['verified', 'unverified', 'queued', 'invalid'].includes(status)) return { error: 'Number verification is temporarily unavailable. Please try again.' };
     return { status: status as VerificationStatus, provider };
   } catch {

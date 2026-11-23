@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { dataHubNetworkKey, hubnetPath, resolveBundleRoute } from "../_shared/bundle-routing.ts";
 import { hubnetReference } from "../_shared/hubnet-reference.ts";
 import { dataHubOrderReference } from "../_shared/datahub-order-reference.ts";
+import { verifyConfiguredNumber } from "../_shared/numberVerification.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -171,6 +172,30 @@ Deno.serve(async (request: Request) => {
   const enabledProviders = { datahub: providerSetting?.value?.enabled?.datahub !== false, hubnet: providerSetting?.value?.enabled?.hubnet !== false };
   const { data: configuredPlan } = await service.from("bundles").select("network,category,subcategory,delivery_provider,delivery_network_type,size").eq("id", body.bundle_id).eq("is_active", true).maybeSingle();
   if (!configuredPlan) return json(400, { error: "This data plan is unavailable." });
+  // The configured live verification APIs currently check MTN eligibility.
+  // Verify before creating/debiting wallet orders, without sending other networks
+  // to an MTN-specific endpoint.
+  if (/\bmtn\b/i.test(String(configuredPlan.network ?? ""))) {
+    const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-real-ip") ??
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    const rateHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${ip}|${accountUserId}`));
+    const rateKey = `number-verification:${Array.from(new Uint8Array(rateHash)).map(value => value.toString(16).padStart(2, "0")).join("")}`;
+    const { data: allowed, error: rateError } = await service.rpc("consume_public_number_verification_rate_limit", {
+      p_rate_key: rateKey, p_limit: 10,
+    });
+    if (rateError) return json(503, { error: "Number verification is temporarily unavailable. No wallet debit was made." });
+    if (allowed !== true) return json(429, { error: "Too many number checks. Please wait a few minutes and try again. No wallet debit was made." });
+    const numberCheck = await verifyConfiguredNumber(service, body.recipient_phone, String(configuredPlan.network));
+    if ("error" in numberCheck) return json(502, { error: `${numberCheck.error} No wallet debit was made.` });
+    if (numberCheck.status !== "verified") {
+      const reason = numberCheck.status === "unverified"
+        ? "Phone Number is Not Verified. You can't buy Data Now.Check again Next Week untill your Number is Verified."
+        : numberCheck.status === "queued"
+          ? "Number verification is still processing. Please try again in a moment."
+          : "This phone number could not be verified. Check the number and try again.";
+      return json(422, { error: `${reason} No wallet debit was made.`, verification_status: numberCheck.status });
+    }
+  }
   const route = resolveBundleRoute(configuredPlan, fallbackProvider);
   const activeProvider = route.provider;
   if (!enabledProviders[activeProvider]) return json(503, { error: `${activeProvider === "hubnet" ? "Hubnet" : "DataHub GH"} is disabled for this plan.` });
