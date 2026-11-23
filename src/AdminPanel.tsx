@@ -81,14 +81,15 @@ export default function AdminPanel({client,notify,onLogout,onAfaPlansChanged,onS
     }
    }
    const agentIds=[...new Set(orderRows.flatMap((order:Row)=>[order.referred_by_agent_id,auditAgentByOrder.get(String(order.id)),order.user_id]).filter(Boolean).map(String))];
-   if(!agentIds.length){setRows(orderRows.map((order:Row)=>({...order,bundle:Array.isArray(order.bundles)?order.bundles[0]??null:order.bundles??null,order_source:'Storefront'})));return}
    const [{data:agents},{data:profiles}]=await Promise.all([
-    client.from('agent_accounts').select('user_id,referral_code,username,business_name').in('user_id',agentIds),
-    client.from('profiles').select('id,email,full_name').in('id',agentIds),
+    agentIds.length?client.from('agent_accounts').select('user_id,referral_code,username,business_name').in('user_id',agentIds):Promise.resolve({data:[] as Row[]}),
+    agentIds.length?client.from('profiles').select('id,email,full_name').in('id',agentIds):Promise.resolve({data:[] as Row[]}),
    ]);
+   const {data:adminProfiles}=await client.from('profiles').select('id,email,full_name,role,created_at').in('role',['admin','super_admin']).order('created_at',{ascending:true}).limit(1);
    if(!live)return;
    const profilesById=new Map((profiles??[]).map((profile:Row)=>[String(profile.id),profile]));
    const agentsById=new Map((agents??[]).map((agent:Row)=>[String(agent.user_id),agent]));
+   const mainStoreAdmin=adminProfiles?.[0] as Row|undefined;
    setRows(orderRows.map((order:Row)=>{
     const referralId=String(order.referred_by_agent_id??auditAgentByOrder.get(String(order.id))??'');
     const buyerId=String(order.user_id??'');
@@ -96,10 +97,11 @@ export default function AdminPanel({client,notify,onLogout,onAfaPlansChanged,onS
     const id=referralId||(isAgentBuyer?buyerId:'');
     const profile=profilesById.get(id);
     const agent=agentsById.get(id);
+    const isMainStoreOrder=!referralId&&!isAgentBuyer;
     return {...order,bundle:Array.isArray(order.bundles)?order.bundles[0]??null:order.bundles??null,
-     agent_name:profile?.full_name||agent?.business_name||agent?.username||profile?.email||null,
-     agent_email:profile?.email??null,
-     agent_label:profile?.full_name||profile?.email||agent?.business_name||agent?.username||agent?.referral_code||null,
+     agent_name:profile?.full_name||agent?.business_name||agent?.username||profile?.email||(isMainStoreOrder?mainStoreAdmin?.full_name||mainStoreAdmin?.email:null)||null,
+     agent_email:profile?.email||(isMainStoreOrder?mainStoreAdmin?.email:null)||null,
+     agent_label:profile?.full_name||profile?.email||agent?.business_name||agent?.username||agent?.referral_code||(isMainStoreOrder?mainStoreAdmin?.full_name||mainStoreAdmin?.email:null)||null,
      order_source:isAgentBuyer?'Agent Dashboard':'Storefront'};
    }));
   }
