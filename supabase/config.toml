@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.admin-delete-account]
 verify_jwt = false
+
+[functions.admin-retry-unknown-datahub-wallet-order]
+verify_jwt = false

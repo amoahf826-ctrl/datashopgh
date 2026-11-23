@@ -35,6 +35,13 @@ function hubnetExplicitlyRejected(payload: any): boolean {
     ["failed", "failure", "rejected", "error"].includes(status);
 }
 
+function dataHubExplicitlyRejected(payload: any): boolean {
+  const envelope = payload?.response ?? payload;
+  const status = String(envelope?.status ?? payload?.status ?? "").trim().toLowerCase();
+  return envelope?.success === false || payload?.success === false || envelope?.status === false || payload?.status === false ||
+    ["failed", "failure", "rejected", "error"].includes(status);
+}
+
 async function getHubnetOrderStatus(base: string, token: string, reference: string) {
   const url = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
   url.searchParams.set("reference", reference);
@@ -252,6 +259,19 @@ Deno.serve(async (request: Request) => {
       ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
       : result?.success === true;
     const providerStatus = normalizeDeliveryStatus(resultData.status ?? resultData.delivery_status ?? resultData.orderStatus ?? resultData.order_status);
+    if (activeProvider === "datahub" && delivery.ok && !accepted && dataHubExplicitlyRejected(result)) {
+      const reason = String(envelope?.message ?? result?.message ?? result?.error ?? resultData?.message ?? "")
+        .replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
+      console.error("DataHub rejected wallet delivery", { reference: deliveryReference, networkType, httpStatus: delivery.status, reason });
+      await service.rpc("update_live_order_delivery", {
+        p_reference: deliveryReference,
+        p_delivery_status: "failed",
+        p_provider_transaction_id: resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? deliveryReference,
+      });
+      const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
+      return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
+        message: refundError ? "DataHub rejected the order. Contact support to reconcile your wallet." : `DataHub rejected the order${reason ? `: ${reason}` : ""}. Your wallet has been refunded.` });
+    }
     if (activeProvider === "hubnet" && delivery.ok && !accepted && hubnetExplicitlyRejected(result)) {
       const reason = String(envelope?.message ?? result?.message ?? result?.error ?? resultData?.message ?? "")
         .replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
