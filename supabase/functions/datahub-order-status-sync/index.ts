@@ -57,6 +57,7 @@ Deno.serve(async (request: Request) => {
   if (error) return json(500, { error: "Pending DataHub orders could not be loaded." });
 
   let updated = 0;
+  let missingProviderReference = 0;
   const queue = [...(orders ?? [])];
   const workers = Array.from({ length: Math.min(8, queue.length) }, async () => {
     while (queue.length) {
@@ -64,6 +65,7 @@ Deno.serve(async (request: Request) => {
       if (!order.delivery_reference) continue;
       try {
         const providerReference = String(order.provider_transaction_id ?? "").trim();
+        if (!providerReference) missingProviderReference++;
         const lookup = new URL("https://user.datahubgh.com/api/external/order-status");
         if (/^\d+$/.test(providerReference)) lookup.searchParams.set("orderNumber", providerReference);
         else lookup.searchParams.set("reference", providerReference || order.delivery_reference);
@@ -74,11 +76,12 @@ Deno.serve(async (request: Request) => {
         const payload = await response.json().catch(() => null);
         if (!response.ok || payload?.success !== true) continue;
         const status = normalizeStatus(payload?.data?.status);
-        if (!status || status === order.delivery_status) continue;
+        const resolvedReference = dataHubOrderReference(payload) ?? providerReference;
+        if (!status || (status === order.delivery_status && resolvedReference === providerReference)) continue;
         const { error: updateError } = await service.rpc("update_live_order_delivery", {
           p_reference: order.delivery_reference,
           p_delivery_status: status,
-          p_provider_transaction_id: providerReference || null,
+          p_provider_transaction_id: resolvedReference || null,
         });
         if (updateError) continue;
         if (status === "failed" && String(order.payment_reference ?? "").startsWith("WALLET-")) {
@@ -93,5 +96,5 @@ Deno.serve(async (request: Request) => {
     }
   });
   await Promise.all(workers);
-  return json(200, { success: true, checked: orders?.length ?? 0, updated });
+  return json(200, { success: true, checked: orders?.length ?? 0, updated, missing_provider_reference: missingProviderReference });
 });

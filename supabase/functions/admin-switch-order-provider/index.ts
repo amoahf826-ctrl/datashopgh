@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { hubnetReference } from "../_shared/hubnet-reference.ts";
+import { dataHubOrderReference } from "../_shared/datahub-order-reference.ts";
 
 const headers={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
 const reply=(status:number,data:Record<string,unknown>)=>new Response(JSON.stringify(data),{status,headers});
@@ -31,7 +32,7 @@ Deno.serve(async(request)=>{
       response=await fetch(`${hubnetBase}/live/api/context/business/transaction/${path}`,{method:"POST",headers:{token,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({phone:order.phone,volume:String(Math.round(Number(size[1])*(size[2].toUpperCase()==="GB"?1000:1))),reference:hubnetReference(order.reference),webhook:supabaseWebhook}),signal:AbortSignal.timeout(15000)});
     }
     const raw=await response.json().catch(()=>null),envelope=provider==="hubnet"?(raw?.response??raw):raw,data=envelope?.data??raw?.data??{},accepted=provider==="hubnet"?(envelope?.status===true||envelope?.status==="success"||raw?.success===true||raw?.status==="success"):raw?.success===true;
-    const providerReference=data.reference??data.transaction_id??data.tracking_id??data.transactionReference;
+    const providerReference=provider==="datahub"?dataHubOrderReference(raw):data.reference??data.transaction_id??data.tracking_id??data.transactionReference;
     if(response.ok&&accepted&&(provider==="hubnet"||typeof providerReference==="string")){
       const status=normalize(data.status??data.delivery_status??data.orderStatus??data.order_status)??"processing";
       const {error}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:status,p_provider_transaction_id:typeof providerReference==="string"?providerReference:(provider==="hubnet"?order.reference:null)});

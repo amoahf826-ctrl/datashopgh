@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { dataHubNetworkKey, resolveBundleRoute } from "../_shared/bundle-routing.ts";
+import { dataHubOrderReference } from "../_shared/datahub-order-reference.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -74,7 +75,7 @@ Deno.serve(async (request) => {
       const payload = await response.json().catch(() => null);
       const data = payload?.data ?? {};
       const accepted = response.ok && payload?.success === true;
-      const providerReference = data.reference ?? data.transaction_id ?? data.tracking_id ?? data.transactionReference;
+      const providerReference = dataHubOrderReference(payload);
       if (!accepted) {
         const responseStatus = String(payload?.status ?? payload?.data?.status ?? "").trim().toLowerCase();
         const definiteRejection = response.status >= 400 && response.status < 500 || payload?.success === false || payload?.status === false ||

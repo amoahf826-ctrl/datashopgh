@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { purchaseDataHubVouchers } from "../_shared/datahub-vouchers.ts";
 import { dataHubNetworkKey, hubnetPath, resolveBundleRoute } from "../_shared/bundle-routing.ts";
 import { hubnetReference } from "../_shared/hubnet-reference.ts";
+import { dataHubOrderReference } from "../_shared/datahub-order-reference.ts";
 
 const response = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -275,7 +276,9 @@ Deno.serve(async (request: Request) => {
     const result = await delivery.json().catch(() => null);
     const envelope = activeProvider === "hubnet" ? (result?.response ?? result) : result;
     const resultData = envelope?.data ?? result?.data ?? {};
-    const providerReference = resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? resultData.transactionReference;
+    const providerReference = activeProvider === "datahub"
+      ? dataHubOrderReference(result)
+      : resultData.reference ?? resultData.transaction_id ?? resultData.tracking_id ?? resultData.transactionReference;
     const accepted = activeProvider === "hubnet"
       ? (envelope?.status === true || envelope?.status === "success" || result?.success === true || result?.status === "success")
       : result?.success === true;
