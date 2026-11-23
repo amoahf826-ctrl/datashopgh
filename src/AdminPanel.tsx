@@ -201,11 +201,13 @@ function StatusOrderPanel({title,status,orders,loading,refundedOrderIds=[],clien
  const filtered=orders.filter(order=>`${order.id} ${order.recipient_phone} ${order.bundle_id} ${order.status} ${order.delivery_provider??''}`.toLowerCase().includes(appliedSearch.toLowerCase()));
  const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));const visible=filtered.slice((page-1)*pageSize,page*pageSize);
  const label=status==='successful'||status==='delivered'?'completed':status==='processing'?'in progress':status;
+ async function freshAdminAuthorization(){if(!client)throw new Error('Admin order actions are not connected. Refresh and try again.');const current=await client.auth.getSession();let session=current.data.session;if(!session||!session.access_token||(session.expires_at??0)<Math.floor(Date.now()/1000)+60){const refreshed=await client.auth.refreshSession();if(refreshed.error||!refreshed.data.session)throw new Error('Your admin session expired. Sign in again, then retry the order.');session=refreshed.data.session}return{Authorization:`Bearer ${session.access_token}`}}
  async function switchFailedOrder(order:Row){
   if(!client||!onNotice||!onRefresh)return;
   const provider=order.delivery_provider==='hubnet'?'datahub':'hubnet';
   if(!window.confirm(`Retry this paid failed order through ${provider==='hubnet'?'Hubnet':'DataHub GH'}? This sends a new delivery request. Make sure the current provider definitively failed it.`))return;
-  const {data,error}=await client.functions.invoke('admin-switch-order-provider',{body:{order_id:order.id,provider}});
+  let authorization:Record<string,string>;try{authorization=await freshAdminAuthorization()}catch(error){onNotice(error instanceof Error?error.message:'Could not refresh your admin session. Sign in again.');return}
+  const {data,error}=await client.functions.invoke('admin-switch-order-provider',{body:{order_id:order.id,provider},headers:authorization});
   if(error||!data?.success){onNotice(data?.error??error?.message??'Could not retry this order through the other provider.');return}
   onNotice(`Order retry submitted through ${provider==='hubnet'?'Hubnet':'DataHub GH'}. Status: ${data.delivery_status??'unknown'}.`);onRefresh();
  }
@@ -215,7 +217,7 @@ function StatusOrderPanel({title,status,orders,loading,refundedOrderIds=[],clien
   if(!window.confirm(`Retry this paid wallet order once through DataHub? This will not debit the wallet again. The order was not visible in your DataHub dashboard. If DataHub accepted the original request but its dashboard is delayed, this retry could deliver a duplicate bundle.`))return;
   setRetryingOrderId(String(order.id));
   try{
-   const {data,error}=await client.functions.invoke('admin-retry-unknown-datahub-wallet-order',{body:{order_ids:[order.id]}});
+   const {data,error}=await client.functions.invoke('admin-retry-unknown-datahub-wallet-order',{body:{order_ids:[order.id]},headers:await freshAdminAuthorization()});
    const result=data?.results?.[0];
    if(error||!result?.success){let serverError='';try{const context=(error as any)?.context;if(context&&typeof context.clone==='function'){const response=context.clone();const payload=await response.json().catch(()=>null);serverError=String(payload?.error??payload?.message??'')}}catch{}onNotice(result?.error||result?.message||data?.error||serverError||error?.message||'Could not retry this order through DataHub.');return}
    onNotice(result.message??`DataHub retry submitted. Status: ${result.delivery_status??'unknown'}.`);
@@ -230,7 +232,7 @@ function StatusOrderPanel({title,status,orders,loading,refundedOrderIds=[],clien
   if(providerReference.length>180){onNotice('DataHub reference is too long.');return}
   setRetryingOrderId(String(order.id));
   try{
-   const {data,error}=await client.functions.invoke('admin-link-datahub-order-reference',{body:{order_id:order.id,provider_reference:providerReference}});
+   const {data,error}=await client.functions.invoke('admin-link-datahub-order-reference',{body:{order_id:order.id,provider_reference:providerReference},headers:await freshAdminAuthorization()});
    if(error||!data?.success){let serverError='';try{const context=(error as any)?.context;if(context&&typeof context.clone==='function'){const payload=await context.clone().json().catch(()=>null);serverError=String(payload?.error??payload?.message??'')}}catch{}onNotice((data?.error??serverError)||error?.message||'Could not link the DataHub reference.');return}
    onNotice('DataHub order reference linked. Checking the live status now.');onRefresh();
   }catch(error){onNotice(error instanceof Error?`Could not link the reference: ${error.message}`:'Could not link the DataHub reference.');}
