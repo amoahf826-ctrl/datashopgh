@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { dataHubOrderReference } from "../_shared/datahub-order-reference.ts";
 
 const headers = {
   "Access-Control-Allow-Origin": "*",
@@ -21,10 +22,25 @@ function secret(legacy: string, collection: string): string | undefined {
 
 type DeliveryStatus = "delivered" | "failed" | "processing";
 function normalizeStatus(value: unknown): DeliveryStatus | null {
-  const status = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
-  if (["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(status)) return "delivered";
+  const status = String(value ?? "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE", "DONE", "FULFILLED", "SUCCESSFULLY", "SUCCESSFULLY_DELIVERED", "DELIVERED_SUCCESSFULLY", "COMPLETED_SUCCESSFULLY"].includes(status)) return "delivered";
   if (["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(status)) return "failed";
   if (["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(status)) return "processing";
+  return null;
+}
+
+/** Read the order's own status. Ignore the API envelope status, which is often "success" even while delivery is still processing. */
+function extractDataHubStatus(payload: any): DeliveryStatus | null {
+  const data = payload?.data ?? payload?.order ?? payload?.result ?? {};
+  const transaction = (Array.isArray(data?.transactions) ? data.transactions[0] : null) ?? data?.transaction ?? {};
+  const candidates = [
+    data?.status, data?.orderStatus, data?.order_status, data?.delivery_status, data?.deliveryStatus, data?.state,
+    transaction?.status, transaction?.orderStatus, transaction?.order_status, transaction?.delivery_status,
+  ];
+  for (const value of candidates) {
+    const status = normalizeStatus(value);
+    if (status) return status;
+  }
   return null;
 }
 
@@ -74,8 +90,8 @@ Deno.serve(async (request: Request) => {
           signal: AbortSignal.timeout(9000),
         });
         const payload = await response.json().catch(() => null);
-        if (!response.ok || payload?.success !== true) continue;
-        const status = normalizeStatus(payload?.data?.status);
+        if (!response.ok || payload?.success === false || payload?.status === false) continue;
+        const status = extractDataHubStatus(payload);
         const resolvedReference = dataHubOrderReference(payload) ?? providerReference;
         if (!status || (status === order.delivery_status && resolvedReference === providerReference)) continue;
         const { error: updateError } = await service.rpc("update_live_order_delivery", {
