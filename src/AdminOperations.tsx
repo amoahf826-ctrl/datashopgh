@@ -21,7 +21,7 @@ export function StatisticsAdmin({client}:{client:SupabaseClient}){
  const dataGb=paidOrders.reduce((sum,order)=>sum+sizeGb(bundleById.get(String(order.bundle_id))?.size),0);
  const uniquePlans=new Set(paidOrders.map(order=>order.bundle_id)).size;
  const cost=paidOrders.reduce((sum,order)=>{const bundle=bundleById.get(String(order.bundle_id));return sum+(Number(bundle?.owner_cost??bundle?.price)||0)},0);
- const agentProfit=paidOrders.filter(order=>order.delivery_status==='delivered'||String(order.status).toLowerCase()==='successful').reduce((sum,order)=>{const log=auditByOrder.get(String(order.id));const details=log?.details??{};const agentId=order.referred_by_agent_id??details.agent_id;if(!agentId)return sum;const base=Number(details.base_price??bundleById.get(String(order.bundle_id))?.price)||0;return sum+Math.max(0,Number(order.price)-base)},0);
+ const agentProfit=paidOrders.filter(order=>order.delivery_status?order.delivery_status==='delivered':String(order.status).toLowerCase()==='successful').reduce((sum,order)=>{const log=auditByOrder.get(String(order.id));const details=log?.details??{};const agentId=order.referred_by_agent_id??details.agent_id;if(!agentId)return sum;const base=Number(details.base_price??bundleById.get(String(order.bundle_id))?.price)||0;return sum+Math.max(0,Number(order.price)-base)},0);
  const profitEarnedAll=profitSummary.reduce((sum,item)=>sum+Number(item.earned||0),0);
  const profitPaid=profitSummary.reduce((sum,item)=>sum+Number(item.paid||0),0);
  const profitPending=profitSummary.reduce((sum,item)=>sum+Number(item.reserved||0),0);
