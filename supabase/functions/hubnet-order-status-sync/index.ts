@@ -23,15 +23,15 @@ function readSecret(legacy: string, collection: string): string | undefined {
 
 type DeliveryStatus = "delivered" | "failed" | "processing";
 function normalizeStatus(value: unknown): DeliveryStatus | null {
-  const status = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "_");
-  if (["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE"].includes(status)) return "delivered";
+  const status = String(value ?? "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (["SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED", "COMPLETE", "SUCCESSFULLY_DELIVERED", "DELIVERED_SUCCESSFULLY"].includes(status)) return "delivered";
   if (["FAILED", "FAILURE", "CANCELLED", "CANCELED", "REJECTED", "REFUNDED"].includes(status)) return "failed";
   if (["PENDING", "QUEUED", "PROCESSING", "IN_PROGRESS", "ACCEPTED"].includes(status)) return "processing";
   return null;
 }
 
 function extractStatus(payload: any): DeliveryStatus | null {
-  const queue = [{ value: payload, allowStatus: false }];
+  const queue = [{ value: payload, allowStatus: false, envelope: true }];
   const seen = new Set<object>();
   while (queue.length) {
     const item = queue.shift()!;
@@ -45,9 +45,17 @@ function extractStatus(payload: any): DeliveryStatus | null {
     if (item.allowStatus) {
       const status = normalizeStatus(current.status);
       if (status) return status;
+    } else if (item.envelope) {
+      const envelopeStatus = String(current.status ?? "").trim().toUpperCase();
+      if (!["SUCCESS", "SUCCESSFUL", "OK", "TRUE"].includes(envelopeStatus)) {
+        const status = normalizeStatus(current.status);
+        if (status) return status;
+      }
     }
     for (const key of ["response", "data", "transaction", "order", "result", "details"]) {
-      if (current[key] && typeof current[key] === "object") queue.push({ value: current[key], allowStatus: key !== "response" });
+      if (current[key] && typeof current[key] === "object") {
+        queue.push({ value: current[key], allowStatus: key !== "response", envelope: key === "response" });
+      }
     }
   }
   return null;
@@ -87,11 +95,17 @@ Deno.serve(async (request: Request) => {
 
   const authHeader = /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
   let updated = 0;
+  let statusUnavailable = 0;
+  let lookupErrors = 0;
+  let updateErrors = 0;
   const queue = [...(orders ?? [])];
   const workers = Array.from({ length: Math.min(8, queue.length) }, async () => {
    while (queue.length) {
     const order = queue.shift()!;
-    if (!order.delivery_reference) continue;
+    if (!order.delivery_reference) {
+      statusUnavailable++;
+      continue;
+    }
     try {
       const checkUrl = new URL(`${base}/live/api/context/business/transaction/check-transaction-status`);
       const candidates = [...new Set([hubnetReference(order.delivery_reference), order.delivery_reference])];
@@ -105,32 +119,48 @@ Deno.serve(async (request: Request) => {
         });
         payload = await response.json().catch(() => null);
         const candidateEnvelope = payload?.response ?? payload;
-        if (response.ok && (candidateEnvelope?.status === true || candidateEnvelope?.status === "success" || payload?.status === true || payload?.status === "success")) break;
+        if (response.ok && (
+          candidateEnvelope?.status === true || candidateEnvelope?.status === "success" ||
+          payload?.status === true || payload?.status === "success" || extractStatus(payload)
+        )) break;
       }
-      if (!response) return;
+      if (!response) {
+        lookupErrors++;
+        return;
+      }
       const envelope = payload?.response ?? payload;
-      const confirmed = envelope?.status === true || envelope?.status === "success" ||
-        payload?.status === true || payload?.status === "success";
-      if (!response.ok || !confirmed) return;
       const deliveryStatus = extractStatus(payload);
-      if (!deliveryStatus) return;
+      const confirmed = envelope?.status === true || envelope?.status === "success" ||
+        payload?.status === true || payload?.status === "success" || deliveryStatus !== null;
+      if (!response.ok || !confirmed) {
+        lookupErrors++;
+        return;
+      }
+      if (!deliveryStatus) {
+        statusUnavailable++;
+        return;
+      }
       if (deliveryStatus === order.delivery_status) return;
       const { error: updateError } = await service.rpc("update_live_order_delivery", {
         p_reference: order.delivery_reference,
         p_delivery_status: deliveryStatus,
         p_provider_transaction_id: envelope?.transaction_id ?? envelope?.tracking_id ?? null,
       });
-      if (updateError) return;
+      if (updateError) {
+        updateErrors++;
+        return;
+      }
       if (deliveryStatus === "failed" && String(order.payment_reference ?? "").startsWith("WALLET-")) {
-        await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: order.delivery_reference });
+        const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: order.delivery_reference });
+        if (refundError) updateErrors++;
       }
       updated++;
-    } catch { /* Leave an unresolved order untouched; a later refresh can check again. */ }
+    } catch { lookupErrors++; }
     finally {
       await service.from("orders").update({ last_provider_status_checked_at: new Date().toISOString() }).eq("id", order.id);
     }
    }
   });
   await Promise.all(workers);
-  return json(200, { success: true, checked: orders?.length ?? 0, updated });
+  return json(200, { success: true, checked: orders?.length ?? 0, updated, status_unavailable: statusUnavailable, lookup_errors: lookupErrors, update_errors: updateErrors });
 });
