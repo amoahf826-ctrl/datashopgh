@@ -1,3 +1,4 @@
+// deno-lint-ignore no-import-prefix -- Supabase Edge Functions use this runtime URL import.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { dataHubOrderReference } from "../_shared/datahub-order-reference.ts";
 
@@ -30,16 +31,37 @@ function normalizeStatus(value: unknown): DeliveryStatus | null {
 }
 
 /** Read the order's own status. Ignore the API envelope status, which is often "success" even while delivery is still processing. */
-function extractDataHubStatus(payload: any): DeliveryStatus | null {
-  const data = payload?.data ?? payload?.order ?? payload?.result ?? {};
-  const transaction = (Array.isArray(data?.transactions) ? data.transactions[0] : null) ?? data?.transaction ?? {};
-  const candidates = [
-    data?.status, data?.orderStatus, data?.order_status, data?.delivery_status, data?.deliveryStatus, data?.state,
-    transaction?.status, transaction?.orderStatus, transaction?.order_status, transaction?.delivery_status,
-  ];
-  for (const value of candidates) {
-    const status = normalizeStatus(value);
-    if (status) return status;
+function extractDataHubStatus(payload: unknown): DeliveryStatus | null {
+  const queue = [{ value: payload, allowStatus: false, envelope: true }];
+  const seen = new Set<object>();
+  while (queue.length) {
+    const { value, allowStatus, envelope } = queue.shift()!;
+    if (!value || typeof value !== "object" || seen.has(value)) continue;
+    seen.add(value);
+    const record = value as Record<string, unknown>;
+    for (const key of ["delivery_status", "deliveryStatus", "order_status", "orderStatus", "state"]) {
+      const status = normalizeStatus(record[key]);
+      if (status) return status;
+    }
+    if (allowStatus) {
+      const status = normalizeStatus(record.status);
+      if (status) return status;
+    } else if (envelope) {
+      const envelopeStatus = String(record.status ?? "").trim().toUpperCase();
+      if (!["SUCCESS", "SUCCESSFUL", "OK", "TRUE"].includes(envelopeStatus)) {
+        const status = normalizeStatus(record.status);
+        if (status) return status;
+      }
+    }
+    for (const key of ["response", "data", "order", "result", "transaction", "transactions", "details"]) {
+      const nested = record[key];
+      const allowNestedStatus = key !== "response";
+      if (Array.isArray(nested)) {
+        for (const item of nested) queue.push({ value: item, allowStatus: allowNestedStatus, envelope: key === "response" });
+      } else if (nested && typeof nested === "object") {
+        queue.push({ value: nested, allowStatus: allowNestedStatus, envelope: key === "response" });
+      }
+    }
   }
   return null;
 }
@@ -74,43 +96,72 @@ Deno.serve(async (request: Request) => {
 
   let updated = 0;
   let missingProviderReference = 0;
+  let statusUnavailable = 0;
+  let lookupErrors = 0;
+  let updateErrors = 0;
   const queue = [...(orders ?? [])];
   const workers = Array.from({ length: Math.min(8, queue.length) }, async () => {
     while (queue.length) {
       const order = queue.shift()!;
-      if (!order.delivery_reference) continue;
+      if (!order.delivery_reference) {
+        statusUnavailable++;
+        continue;
+      }
       try {
         const providerReference = String(order.provider_transaction_id ?? "").trim();
-        if (!providerReference) missingProviderReference++;
+        if (!providerReference) {
+          missingProviderReference++;
+          statusUnavailable++;
+          continue;
+        }
         const lookup = new URL("https://user.datahubgh.com/api/external/order-status");
         if (/^\d+$/.test(providerReference)) lookup.searchParams.set("orderNumber", providerReference);
-        else lookup.searchParams.set("reference", providerReference || order.delivery_reference);
+        else lookup.searchParams.set("reference", providerReference);
         const response = await fetch(lookup, {
           headers: { "X-API-Key": dataHubKey, Accept: "application/json" },
           signal: AbortSignal.timeout(9000),
         });
         const payload = await response.json().catch(() => null);
-        if (!response.ok || payload?.success === false || payload?.status === false) continue;
+        if (!response.ok || payload?.success === false || payload?.status === false) {
+          lookupErrors++;
+          continue;
+        }
         const status = extractDataHubStatus(payload);
         const resolvedReference = dataHubOrderReference(payload) ?? providerReference;
-        if (!status || (status === order.delivery_status && resolvedReference === providerReference)) continue;
+        if (!status) {
+          statusUnavailable++;
+          continue;
+        }
+        if (status === order.delivery_status && resolvedReference === providerReference) continue;
         const { error: updateError } = await service.rpc("update_live_order_delivery", {
           p_reference: order.delivery_reference,
           p_delivery_status: status,
           p_provider_transaction_id: resolvedReference || null,
         });
-        if (updateError) continue;
+        if (updateError) {
+          updateErrors++;
+          continue;
+        }
         if (status === "failed" && String(order.payment_reference ?? "").startsWith("WALLET-")) {
-          await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: order.delivery_reference });
+          const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: order.delivery_reference });
+          if (refundError) updateErrors++;
         }
         updated++;
       } catch {
-        // Leave uncertain or temporarily unreachable provider results unchanged; the next refresh retries lookup only.
+        lookupErrors++;
       } finally {
         await service.from("orders").update({ last_provider_status_checked_at: new Date().toISOString() }).eq("id", order.id);
       }
     }
   });
   await Promise.all(workers);
-  return json(200, { success: true, checked: orders?.length ?? 0, updated, missing_provider_reference: missingProviderReference });
+  return json(200, {
+    success: true,
+    checked: orders?.length ?? 0,
+    updated,
+    missing_provider_reference: missingProviderReference,
+    status_unavailable: statusUnavailable,
+    lookup_errors: lookupErrors,
+    update_errors: updateErrors,
+  });
 });
