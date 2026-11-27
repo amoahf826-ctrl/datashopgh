@@ -81,8 +81,11 @@ Deno.serve(async (request) => {
         const definiteRejection = response.status >= 400 && response.status < 500 || payload?.success === false || payload?.status === false ||
           ["failed", "failure", "rejected", "error"].includes(responseStatus);
         if (!definiteRejection) {
-          await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "unknown" });
-          outcomes.push({ order_id: orderId, success: true, delivery_status: "unknown", message: "DataHub response was ambiguous; wallet debit retained. Reconcile with DataHub before another attempt." });
+          await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "failed" });
+          const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
+          outcomes.push({ order_id: orderId, success: false, delivery_status: "failed", message: refundError
+            ? "DataHub response was ambiguous. Contact support to reconcile the wallet refund."
+            : "DataHub response was ambiguous. The wallet was refunded." });
           continue;
         }
         const { error: statusError } = await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "failed",
@@ -116,9 +119,12 @@ Deno.serve(async (request) => {
         outcomes.push({ order_id: orderId, success: true, delivery_status: deliveryStatus, provider_reference: providerReference });
       }
     } catch (error) {
-      await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "unknown" });
+      await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "failed" });
+      const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
       console.error("Admin DataHub retry ambiguous", { orderId, error: String(error) });
-      outcomes.push({ order_id: orderId, success: true, delivery_status: "unknown", message: "The provider request timed out or failed ambiguously. Wallet debit retained; reconcile with DataHub before another attempt." });
+      outcomes.push({ order_id: orderId, success: false, delivery_status: "failed", message: refundError
+        ? "The provider request timed out. Contact support to reconcile the wallet refund."
+        : "The provider request timed out. The wallet was refunded." });
     }
   }
   return json(200, { success: outcomes.every((result) => result.success), results: outcomes });

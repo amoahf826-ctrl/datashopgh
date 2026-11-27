@@ -10,6 +10,9 @@ verify_jwt = false
 [functions.datahub-order-status-sync]
 verify_jwt = false
 
+[functions.hubnet-order-status-sync]
+verify_jwt = false
+
 [functions.admin-link-datahub-order-reference]
 verify_jwt = false
 

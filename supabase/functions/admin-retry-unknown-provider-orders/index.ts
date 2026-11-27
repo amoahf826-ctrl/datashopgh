@@ -45,6 +45,23 @@ function definitelyRejected(provider: "datahub" | "hubnet", payload: any): boole
     payload?.success === false || ["failed", "failure", "rejected", "error"].includes(status);
 }
 
+async function requestPaystackRefund(orderId: string, paymentReference: string, amount: number): Promise<boolean> {
+  const secret = Deno.env.get("PAYSTACK_SECRET_KEY")?.trim();
+  if (!secret || !paymentReference || !Number.isSafeInteger(amount) || amount <= 0) return false;
+  try {
+    const response = await fetch("https://api.paystack.co/refund", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ transaction: paymentReference, amount, currency: "GHS",
+        reference: `ORDREF-${orderId.replaceAll("-", "")}`, customer_note: "Refund for uncertain data bundle delivery",
+        merchant_note: `Ambiguous provider retry for order ${orderId}` }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const result = await response.json().catch(() => null);
+    return response.ok && result?.status === true;
+  } catch { return false; }
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
@@ -74,7 +91,7 @@ Deno.serve(async (request: Request) => {
 
   const service = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: initialOrders, error: loadError } = await service.from("orders")
-    .select("id,delivery_provider").in("id", orderIds);
+    .select("id,delivery_provider,payment_reference,price,charge_amount").in("id", orderIds);
   if (loadError) return json(500, { error: "Could not load the selected orders." });
   const providers = new Set((initialOrders ?? []).map((order) => order.delivery_provider));
   const datahubKey = readSecret("DATAHUB_API_KEY", "DATAHUB_API_KEYS");
@@ -98,7 +115,8 @@ Deno.serve(async (request: Request) => {
 
   const outcomes: Record<string, unknown>[] = [];
   for (const orderId of orderIds as string[]) {
-    const provider = (initialOrders ?? []).find((order) => order.id === orderId)?.delivery_provider;
+    const initialOrder = (initialOrders ?? []).find((order) => order.id === orderId);
+    const provider = initialOrder?.delivery_provider;
     if (provider !== "datahub" && provider !== "hubnet") {
       outcomes.push({ order_id: orderId, success: false, error: "The order has no supported delivery provider." });
       continue;
@@ -179,7 +197,7 @@ Deno.serve(async (request: Request) => {
         });
         if (updateError) {
           console.error("Could not save the retried provider order status.", { orderId, provider, code: updateError.code });
-          outcomes.push({ order_id: orderId, success: false, delivery_status: "unknown", error: "Provider accepted the retry, but its status could not be saved. Reconcile before another attempt." });
+          outcomes.push({ order_id: orderId, success: false, delivery_status: "processing", error: "Provider accepted the retry, but its status could not be saved. Reconcile before another attempt." });
           continue;
         }
         if (status === "failed" && String(claim.payment_reference ?? "").startsWith("WALLET-")) {
@@ -194,7 +212,7 @@ Deno.serve(async (request: Request) => {
       }
 
       const rejected = response.status >= 400 && response.status < 500 || definitelyRejected(provider, payload);
-      const status = rejected ? "failed" : "unknown";
+      const status = "failed";
       const { error: updateError } = await service.rpc("update_live_order_delivery", {
         p_reference: claim.reference,
         p_delivery_status: status,
@@ -203,15 +221,20 @@ Deno.serve(async (request: Request) => {
       });
       if (updateError) {
         console.error("Could not save the unresolved provider retry status.", { orderId, provider, code: updateError.code });
-        outcomes.push({ order_id: orderId, success: false, delivery_status: "unknown", error: "The provider response could not be saved. Reconcile before another attempt." });
+        outcomes.push({ order_id: orderId, success: false, delivery_status: "processing", error: "The provider response could not be saved. Reconcile before another attempt." });
         continue;
       }
-      if (rejected && String(claim.payment_reference ?? "").startsWith("WALLET-")) {
+      if (String(claim.payment_reference ?? initialOrder?.payment_reference ?? "").startsWith("WALLET-")) {
         const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: claim.reference });
         if (refundError) {
           outcomes.push({ order_id: orderId, success: false, delivery_status: status, error: "Provider rejected delivery, but the wallet refund needs admin review." });
           continue;
         }
+      } else {
+        const paymentReference = String(claim.payment_reference ?? initialOrder?.payment_reference ?? "");
+        const amount = Math.round(Number(initialOrder?.charge_amount ?? initialOrder?.price) * 100);
+        const refundQueued = await requestPaystackRefund(orderId, paymentReference, amount);
+        if (!refundQueued) console.error("Paystack refund request could not be confirmed after an ambiguous retry.", { orderId });
       }
       console.warn("Admin provider retry returned an unresolved result.", {
         orderId,
@@ -220,8 +243,8 @@ Deno.serve(async (request: Request) => {
         responseStatus: String((payload?.response ?? payload)?.status ?? "missing"),
         accepted,
       });
-      outcomes.push({ order_id: orderId, success: !rejected, delivery_status: status,
-        message: rejected ? "Provider rejected the retry." : "Provider response is uncertain; reconcile before another attempt." });
+      outcomes.push({ order_id: orderId, success: false, delivery_status: status,
+        message: rejected ? "Provider rejected the retry." : "Provider outcome was uncertain. The order was failed and its payment refund was requested." });
     } catch (error) {
       console.error("Admin provider retry outcome could not be confirmed.", {
         orderId,
@@ -230,12 +253,20 @@ Deno.serve(async (request: Request) => {
       });
       const { error: statusError } = await service.rpc("update_live_order_delivery", {
         p_reference: claim.reference,
-        p_delivery_status: "unknown",
+        p_delivery_status: "failed",
         p_provider_transaction_id: provider === "hubnet" ? hubnetReference(claim.reference) : null,
       });
       if (statusError) console.error("Could not save the uncertain provider retry status.", { orderId, code: statusError.code });
-      outcomes.push({ order_id: orderId, success: true, delivery_status: "unknown",
-        message: "Provider outcome is uncertain; reconcile before another attempt." });
+      if (!statusError && String(claim.payment_reference ?? initialOrder?.payment_reference ?? "").startsWith("WALLET-")) {
+        const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: claim.reference });
+        if (refundError) console.error("Wallet refund needs reconciliation after an ambiguous retry.", { orderId });
+      } else if (!statusError) {
+        const paymentReference = String(claim.payment_reference ?? initialOrder?.payment_reference ?? "");
+        const amount = Math.round(Number(initialOrder?.charge_amount ?? initialOrder?.price) * 100);
+        if (!await requestPaystackRefund(orderId, paymentReference, amount)) console.error("Paystack refund needs reconciliation after an ambiguous retry.", { orderId });
+      }
+      outcomes.push({ order_id: orderId, success: false, delivery_status: "failed",
+        message: "Provider outcome was uncertain. The order was failed and its payment refund was requested." });
     }
   }
 

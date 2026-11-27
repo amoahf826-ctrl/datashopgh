@@ -33,7 +33,7 @@ const unavailable:Partial<Record<Section,string>>={publicUpdates:'Public notices
 
 export default function AdminPanel({client,notify,onLogout,onAfaPlansChanged,onSettingsChanged,liveSalesEnabled,onBackToDashboard}:{client:SupabaseClient;notify:(message:string)=>void;onLogout:()=>void;onAfaPlansChanged:()=>void;onSettingsChanged:()=>void;liveSalesEnabled:boolean;onBuyData:()=>void;onBackToDashboard:()=>void}){
  const today=dateInputValue(new Date());
- const initialOrderStart=new Date();initialOrderStart.setHours(0,0,0,0);initialOrderStart.setDate(initialOrderStart.getDate()-6);
+ const initialOrderStart=new Date();initialOrderStart.setHours(0,0,0,0);
  const catalogLoadedAtRefresh=useRef<number|null>(null);
  const [section,setSection]=useState<Section>('overview'),[sectionHistory,setSectionHistory]=useState<Section[]>([]),[mobileOpen,setMobileOpen]=useState(false),[summary,setSummary]=useState<Summary>(empty),[networks,setNetworks]=useState<Row[]>([]),[bundles,setBundles]=useState<Row[]>([]),[categories,setCategories]=useState<Row[]>([]),[subcategories,setSubcategories]=useState<Row[]>([]),[rows,setRows]=useState<Row[]>([]),[refundedOrderIds,setRefundedOrderIds]=useState<string[]>([]),[overviewOrders,setOverviewOrders]=useState<Row[]>([]),[overviewRefundedIds,setOverviewRefundedIds]=useState<string[]>([]),[loading,setLoading]=useState(true),[refresh,setRefresh]=useState(0),[orderDates,setOrderDates]=useState({start:dateInputValue(initialOrderStart),end:today});
  useEffect(()=>{let live=true;async function load(){
@@ -206,8 +206,8 @@ function AdminPlaceholder({title,message}:{title:string;message:string}){return 
 
 function OrdersWorkbench({orders,refundedOrderIds,summary,loading,onApplyDates,onNotice,liveSalesEnabled}:{orders:Row[];refundedOrderIds:string[];summary:Summary;loading:boolean;onApplyDates:(dates:{start:string;end:string})=>void;onNotice:(message:string)=>void;liveSalesEnabled:boolean}){
  const today=dateInputValue(new Date());
- const initialOrderStart=new Date();initialOrderStart.setHours(0,0,0,0);initialOrderStart.setDate(initialOrderStart.getDate()-6);
- const [range,setRange]=useState('7d'),[start,setStart]=useState(dateInputValue(initialOrderStart)),[end,setEnd]=useState(today);
+ const initialOrderStart=new Date();initialOrderStart.setHours(0,0,0,0);
+ const [range,setRange]=useState('today'),[start,setStart]=useState(dateInputValue(initialOrderStart)),[end,setEnd]=useState(today);
  const pending=orders.filter(order=>order.status==='pending'&&order.is_demo);
  const refundedIds=new Set(refundedOrderIds);
  const liveOrders=orders.filter(order=>!order.is_demo&&order.payment_status==='successful');

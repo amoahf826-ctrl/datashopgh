@@ -16,6 +16,23 @@ Deno.serve(async(request)=>{
   if(typeof body.order_id!=="string"||!/^[0-9a-f-]{36}$/i.test(body.order_id)||!(["datahub","hubnet"] as unknown[]).includes(body.provider))return reply(400,{error:"Choose a valid order and provider."});
   const provider=body.provider as "datahub"|"hubnet",service=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
   const {data:order,error:claimError}=await service.rpc("admin_claim_provider_retry",{p_order_id:body.order_id,p_provider:provider,p_actor:userData.user.id});if(claimError||!order)return reply(409,{error:claimError?.message??"Could not safely claim this order for retry."});
+  const {data:paymentInfo}=await service.from("orders").select("payment_reference,price,charge_amount").eq("id",body.order_id).maybeSingle();
+  async function failAmbiguousAttempt(){
+    const {error:updateError}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed",p_provider_transaction_id:provider==="hubnet"?hubnetReference(order.reference):null});
+    if(updateError)return false;
+    const paymentReference=String(paymentInfo?.payment_reference??"");
+    if(paymentReference.startsWith("WALLET-")){
+      const {error}=await service.rpc("refund_failed_wallet_bundle_order",{p_delivery_reference:order.reference});
+      return !error;
+    }
+    const secret=Deno.env.get("PAYSTACK_SECRET_KEY")?.trim();
+    const amount=Math.round(Number(paymentInfo?.charge_amount??paymentInfo?.price)*100);
+    if(!secret||!paymentReference||!Number.isSafeInteger(amount)||amount<=0)return false;
+    try{
+      const refund=await fetch("https://api.paystack.co/refund",{method:"POST",headers:{Authorization:`Bearer ${secret}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({transaction:paymentReference,amount,currency:"GHS",reference:`ORDREF-${String(body.order_id).replaceAll("-","")}`,customer_note:"Refund for uncertain data bundle delivery",merchant_note:`Ambiguous provider retry for order ${body.order_id}`}),signal:AbortSignal.timeout(15000)});
+      const result=await refund.json().catch(()=>null);return refund.ok&&result?.status===true;
+    }catch{return false}
+  }
   const datahubKey=readSecret("DATAHUB_API_KEY","DATAHUB_API_KEYS"),hubnetToken=Deno.env.get("HUBNET_BEARER_TOKEN")?.trim(),hubnetBase=(Deno.env.get("HUBNET_API_BASE_URL")?.trim()||"https://hubnet.app").replace(/\/+$/,"");
   const appBase=(Deno.env.get("APP_BASE_URL")?.trim()||"https://cheapdatabundle.com").replace(/\/+$/,"");
   let appOrigin:string;
@@ -43,8 +60,8 @@ Deno.serve(async(request)=>{
       return reply(200,{success:true,delivery_status:status});
     }
     if(response.status>=400&&response.status<500){await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});return reply(502,{error:String(raw?.message??raw?.error??"The alternate provider rejected the retry." )})}
-    await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"unknown",p_provider_transaction_id:provider==="hubnet"?hubnetReference(order.reference):null});return reply(202,{success:true,delivery_status:"unknown",message:"Provider response is uncertain. Check order status before taking action."});
+    const refundRequested=await failAmbiguousAttempt();return reply(202,{success:true,delivery_status:"failed",refund_requested:refundRequested,message:refundRequested?"Provider response was uncertain. The order was failed and its refund was requested.":"Provider response was uncertain. The order was failed, but the refund needs admin review."});
   }catch{
-    await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"unknown",p_provider_transaction_id:provider==="hubnet"?hubnetReference(order.reference):null});return reply(202,{success:true,delivery_status:"unknown",message:"Provider response is uncertain. Check order status before retrying."});
+    const refundRequested=await failAmbiguousAttempt();return reply(202,{success:true,delivery_status:"failed",refund_requested:refundRequested,message:refundRequested?"Provider request timed out. The order was failed and its refund was requested.":"Provider request timed out. The order was failed, but the refund needs admin review."});
   }
 });

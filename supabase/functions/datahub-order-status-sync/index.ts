@@ -21,6 +21,13 @@ function secret(legacy: string, collection: string): string | undefined {
   } catch { return undefined; }
 }
 
+function matchesCronSecret(supplied: string, expected: string | undefined): boolean {
+  if (!expected || supplied.length !== expected.length) return false;
+  let difference = 0;
+  for (let index = 0; index < expected.length; index++) difference |= supplied.charCodeAt(index) ^ expected.charCodeAt(index);
+  return difference === 0;
+}
+
 type DeliveryStatus = "delivered" | "failed" | "processing";
 function normalizeStatus(value: unknown): DeliveryStatus | null {
   const status = String(value ?? "").trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -70,7 +77,9 @@ Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers });
   if (request.method !== "POST") return json(405, { error: "Method not allowed." });
   const authorization = request.headers.get("Authorization");
-  if (!authorization?.startsWith("Bearer ")) return json(401, { error: "Sign in to refresh order status." });
+  const cronAuthorized = matchesCronSecret(request.headers.get("x-provider-status-sync-secret") ?? "",
+    Deno.env.get("PROVIDER_STATUS_SYNC_CRON_SECRET")?.trim());
+  if (!cronAuthorized && !authorization?.startsWith("Bearer ")) return json(401, { error: "Sign in to refresh order status." });
 
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = secret("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
@@ -80,17 +89,26 @@ Deno.serve(async (request: Request) => {
     return json(503, { error: "DataHub order status is not configured." });
   }
 
-  const auth = createClient(url, anonKey, { global: { headers: { Authorization: authorization } } });
-  const { data: authData, error: authError } = await auth.auth.getUser();
-  if (authError || !authData.user) return json(401, { error: "Your session expired. Sign in again." });
   const service = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: profile } = await service.from("profiles").select("role").eq("id", authData.user.id).maybeSingle();
+  let profile: { role?: string | null } | null = null;
+  let userId: string | null = null;
+  if (!cronAuthorized) {
+    const auth = createClient(url, anonKey, { global: { headers: { Authorization: authorization! } } });
+    const { data: authData, error: authError } = await auth.auth.getUser();
+    if (authError || !authData.user) return json(401, { error: "Your session expired. Sign in again." });
+    userId = authData.user.id;
+    const { data } = await service.from("profiles").select("role").eq("id", authData.user.id).maybeSingle();
+    profile = data;
+  }
   let query = service.from("orders")
     .select("id,delivery_reference,provider_transaction_id,payment_reference,delivery_status,last_provider_status_checked_at")
     .eq("is_demo", false).eq("payment_status", "successful").eq("delivery_provider", "datahub")
     .in("delivery_status", ["queued", "processing", "unknown"])
     .order("last_provider_status_checked_at", { ascending: true, nullsFirst: true }).limit(40);
-  if (profile?.role !== "admin") query = query.or(`user_id.eq.${authData.user.id},referred_by_agent_id.eq.${authData.user.id}`);
+  if (!cronAuthorized && profile?.role !== "admin") {
+    if (!userId) return json(401, { error: "Your session expired. Sign in again." });
+    query = query.or(`user_id.eq.${userId},referred_by_agent_id.eq.${userId}`);
+  }
   const { data: orders, error } = await query;
   if (error) return json(500, { error: "Pending DataHub orders could not be loaded." });
 
