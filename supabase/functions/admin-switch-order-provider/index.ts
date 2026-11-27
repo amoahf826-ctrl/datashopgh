@@ -17,6 +17,9 @@ Deno.serve(async(request)=>{
   const provider=body.provider as "datahub"|"hubnet",service=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
   const {data:order,error:claimError}=await service.rpc("admin_claim_provider_retry",{p_order_id:body.order_id,p_provider:provider,p_actor:userData.user.id});if(claimError||!order)return reply(409,{error:claimError?.message??"Could not safely claim this order for retry."});
   const datahubKey=readSecret("DATAHUB_API_KEY","DATAHUB_API_KEYS"),hubnetToken=Deno.env.get("HUBNET_BEARER_TOKEN")?.trim(),hubnetBase=(Deno.env.get("HUBNET_API_BASE_URL")?.trim()||"https://hubnet.app").replace(/\/+$/,"");
+  const appBase=(Deno.env.get("APP_BASE_URL")?.trim()||"https://cheapdatabundle.com").replace(/\/+$/,"");
+  let appOrigin:string;
+  try{const base=new URL(appBase);if(base.protocol!=="https:"||base.pathname!=="/"||base.username||base.password||base.search||base.hash)throw new Error();appOrigin=base.origin}catch{return reply(503,{error:"APP_BASE_URL must be a secure site origin."})}
   if(provider==="datahub"&&!datahubKey||provider==="hubnet"&&!hubnetToken){await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});return reply(503,{error:`${provider==="hubnet"?"Hubnet":"DataHub GH"} credentials are not configured.`})}
   if(provider==="hubnet")try{const base=new URL(hubnetBase);if(base.protocol!=="https:"||base.hostname!=="hubnet.app"||base.username||base.password)throw new Error()}catch{await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});return reply(503,{error:"HUBNET_API_BASE_URL must use the verified Hubnet HTTPS origin."})}
   const size=String(order.size??"").match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i),category=`${order.category} ${order.subcategory}`.toLowerCase();
@@ -25,7 +28,7 @@ Deno.serve(async(request)=>{
   const supabaseWebhook=`${url.replace(/\/+$/,"")}/functions/v1/hubnet-webhook`;
   try{
     let response:Response;
-    if(provider==="datahub")response=await fetch("https://user.datahubgh.com/api/external/data-purchase",{method:"POST",headers:{"X-API-Key":datahubKey!,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({networkKey,recipient:order.phone,capacity:String(Number((Number(size[1])*(size[2].toUpperCase()==="GB"?1:.001)).toFixed(3)))}),signal:AbortSignal.timeout(15000)});
+    if(provider==="datahub")response=await fetch("https://user.datahubgh.com/api/external/data-purchase",{method:"POST",headers:{"X-API-Key":datahubKey!,"Content-Type":"application/json",Accept:"application/json",Origin:appOrigin,Referer:`${appOrigin}/`},body:JSON.stringify({networkKey,recipient:order.phone,capacity:String(Number((Number(size[1])*(size[2].toUpperCase()==="GB"?1:.001)).toFixed(3)))}),signal:AbortSignal.timeout(15000)});
     else{
       const path=networkKey==="AT_BIGTIME"?"big-time-new-transaction":networkKey==="TELECEL"?"telecel-new-transaction":networkKey==="AT_PREMIUM"?"at-new-transaction":"mtn-new-transaction";
       const token=/^Bearer\s+/i.test(hubnetToken!)?hubnetToken!:`Bearer ${hubnetToken}`;
