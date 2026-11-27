@@ -296,7 +296,7 @@ Deno.serve(async (request: Request) => {
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,
         p_delivery_status: providerStatus ?? "unknown",
-        p_provider_transaction_id: typeof providerReference === "string" ? providerReference : (activeProvider === "hubnet" ? claim.delivery_reference : null),
+        p_provider_transaction_id: typeof providerReference === "string" ? providerReference : (activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null),
       });
     } else if (delivery.ok && result?.success === true) {
       await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "unknown" });

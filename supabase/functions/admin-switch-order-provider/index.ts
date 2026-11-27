@@ -35,7 +35,7 @@ Deno.serve(async(request)=>{
     const providerReference=provider==="datahub"?dataHubOrderReference(raw):data.reference??data.transaction_id??data.tracking_id??data.transactionReference;
     if(response.ok&&accepted&&(provider==="hubnet"||typeof providerReference==="string")){
       const status=normalize(data.status??data.delivery_status??data.orderStatus??data.order_status)??"processing";
-      const {error}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:status,p_provider_transaction_id:typeof providerReference==="string"?providerReference:(provider==="hubnet"?order.reference:null)});
+      const {error}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:status,p_provider_transaction_id:typeof providerReference==="string"?providerReference:(provider==="hubnet"?hubnetReference(order.reference):null)});
       if(error)return reply(500,{error:"Provider accepted the retry, but order status could not be saved. Check the order status before retrying again."});
       return reply(200,{success:true,delivery_status:status});
     }
