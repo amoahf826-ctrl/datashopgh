@@ -18,7 +18,7 @@ Deno.serve(async(request)=>{
   const {data:order,error:claimError}=await service.rpc("admin_claim_provider_retry",{p_order_id:body.order_id,p_provider:provider,p_actor:userData.user.id});if(claimError||!order)return reply(409,{error:claimError?.message??"Could not safely claim this order for retry."});
   const {data:paymentInfo}=await service.from("orders").select("payment_reference,price,charge_amount").eq("id",body.order_id).maybeSingle();
   async function failAmbiguousAttempt(){
-    const {error:updateError}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed",p_provider_transaction_id:provider==="hubnet"?hubnetReference(order.reference):null});
+    const {error:updateError}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed",p_provider_transaction_id:null});
     if(updateError)return false;
     const paymentReference=String(paymentInfo?.payment_reference??"");
     if(paymentReference.startsWith("WALLET-")){
@@ -59,7 +59,7 @@ Deno.serve(async(request)=>{
       if(error)return reply(500,{error:"Provider accepted the retry, but order status could not be saved. Check the order status before retrying again."});
       return reply(200,{success:true,delivery_status:status});
     }
-    if(response.status>=400&&response.status<500){await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});return reply(502,{error:String(raw?.message??raw?.error??"The alternate provider rejected the retry." )})}
+    if(response.status>=400&&response.status<500){const {error:updateError}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});if(updateError)return reply(500,{error:"The provider rejected the retry, but the failed status could not be saved. Reconcile this order before another action."});const refundRequested=await failAmbiguousAttempt();return reply(200,{success:true,delivery_status:"failed",refund_requested:refundRequested,message:refundRequested?`The provider rejected the retry. The ${String(paymentInfo?.payment_reference??"").startsWith("WALLET-")?"wallet":"payment"} refund was requested.`:"The provider rejected the retry, but the refund needs admin review."})}
     const refundRequested=await failAmbiguousAttempt();return reply(202,{success:true,delivery_status:"failed",refund_requested:refundRequested,message:refundRequested?"Provider response was uncertain. The order was failed and its refund was requested.":"Provider response was uncertain. The order was failed, but the refund needs admin review."});
   }catch{
     const refundRequested=await failAmbiguousAttempt();return reply(202,{success:true,delivery_status:"failed",refund_requested:refundRequested,message:refundRequested?"Provider request timed out. The order was failed and its refund was requested.":"Provider request timed out. The order was failed, but the refund needs admin review."});
