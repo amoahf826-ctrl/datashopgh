@@ -333,10 +333,11 @@ Deno.serve(async (request: Request) => {
           try { confirmedStatus = await getHubnetOrderStatus(hubnetBase, hubnetToken!, providerTransactionReference!); }
           catch { confirmedStatus = null; }
           if (!confirmedStatus) {
-            await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "unknown",
+            await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "failed",
               p_provider_transaction_id: providerTransactionReference });
-            return json(200, { success: true, ...order, delivery_status: "unknown",
-              message: "Hubnet accepted the order, but its final status is not confirmed yet. Please check order history shortly." });
+            const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
+            return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
+              message: refundError ? "Hubnet's final status could not be confirmed. Contact support to reconcile your wallet." : "Hubnet's final status could not be confirmed. Your wallet has been refunded." });
           }
           if (confirmedStatus !== "failed") {
             await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: confirmedStatus,
@@ -391,13 +392,14 @@ Deno.serve(async (request: Request) => {
     });
     await service.rpc("update_live_order_delivery", {
       p_reference: deliveryReference,
-      p_delivery_status: "unknown",
+      p_delivery_status: "failed",
       p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(deliveryReference) : null,
     });
-    return json(200, { success: true, ...order, delivery_status: "unknown",
-      message: "Order status is being checked. Please do not submit it again." });
+    const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
+    return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
+      message: refundError ? "The provider response was uncertain. Contact support to reconcile your wallet." : "The provider response was uncertain. Your wallet has been refunded." });
   } catch (error) {
-    // The provider may have accepted the request before a network timeout. Never auto-refund an uncertain delivery.
+    // Ambiguous provider submission outcomes follow the configured fail-and-refund policy.
     console.error("Provider delivery request failed ambiguously", {
       provider: activeProvider,
       reference: deliveryReference,
@@ -405,10 +407,11 @@ Deno.serve(async (request: Request) => {
     });
     await service.rpc("update_live_order_delivery", {
       p_reference: deliveryReference,
-      p_delivery_status: "unknown",
+      p_delivery_status: "failed",
       p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(deliveryReference) : null,
     });
-    return json(200, { success: true, ...order, delivery_status: "unknown",
-      message: "Order status is being checked. Please do not submit it again." });
+    const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: deliveryReference });
+    return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
+      message: refundError ? "The provider request timed out. Contact support to reconcile your wallet." : "The provider request timed out. Your wallet has been refunded." });
   }
 });

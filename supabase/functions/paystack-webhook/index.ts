@@ -40,6 +40,21 @@ function readSupabaseServiceKey(): string | undefined {
   } catch { return undefined; }
 }
 
+async function requestOrderRefund(secret: string, reference: string, orderId: string, amount: number) {
+  const refundReference = `ORDREF-${orderId.replaceAll("-", "")}`;
+  try {
+    const refundResponse = await fetch("https://api.paystack.co/refund", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ transaction: reference, amount, currency: "GHS", reference: refundReference,
+        customer_note: "Refund for uncertain data bundle delivery", merchant_note: `Ambiguous provider delivery for order ${orderId}` }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const result = await refundResponse.json().catch(() => null);
+    return refundResponse.ok && result?.status === true;
+  } catch { return false; }
+}
+
 async function validSignature(raw: string, signature: string, secret: string): Promise<boolean> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
@@ -245,6 +260,13 @@ Deno.serve(async (request: Request) => {
   });
   if (claimError) return response(500, { error: "Verified payment could not be reconciled." });
   if (!claim?.newly_paid) return response(200, { received: true, duplicate: true });
+  const failAndRefundAmbiguousOrder = async () => {
+    await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "failed",
+      p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null });
+    const refundQueued = await requestOrderRefund(secret, reference, claim.order_id, verification.data.amount);
+    if (!refundQueued) console.error("Paystack refund request could not be confirmed", { orderId: claim.order_id });
+    return refundQueued;
+  };
   await service.from("orders").update({ delivery_provider: activeProvider }).eq("id", claim.order_id);
   const size = String(claim.size ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i);
   if (!networkKey || !size) {
@@ -299,11 +321,7 @@ Deno.serve(async (request: Request) => {
         p_provider_transaction_id: typeof providerReference === "string" ? providerReference : (activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null),
       });
     } else if (delivery.ok && result?.success === true) {
-      await service.rpc("update_live_order_delivery", {
-        p_reference: claim.delivery_reference,
-        p_delivery_status: "unknown",
-        p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null,
-      });
+      await failAndRefundAmbiguousOrder();
     } else if (delivery.status >= 400 && delivery.status < 500) {
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference, p_delivery_status: "failed",
@@ -317,24 +335,16 @@ Deno.serve(async (request: Request) => {
         hasProviderReference: typeof providerReference === "string",
         hasProviderStatus: providerStatus !== null,
       });
-      await service.rpc("update_live_order_delivery", {
-        p_reference: claim.delivery_reference,
-        p_delivery_status: "unknown",
-        p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null,
-      });
+      await failAndRefundAmbiguousOrder();
     }
   } catch (error) {
-    // A timeout can happen after Hubnet accepted the request. Keep it unknown to prevent accidental duplicate delivery.
+    // Ambiguous purchase outcomes follow the configured fail-and-refund policy.
     console.error("Provider paid-delivery request failed ambiguously", {
       provider: activeProvider,
       reference: claim.delivery_reference,
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
-    await service.rpc("update_live_order_delivery", {
-      p_reference: claim.delivery_reference,
-      p_delivery_status: "unknown",
-      p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null,
-    });
+    await failAndRefundAmbiguousOrder();
   }
   return response(200, { received: true });
 });
