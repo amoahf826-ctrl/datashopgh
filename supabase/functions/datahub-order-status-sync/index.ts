@@ -112,6 +112,9 @@ Deno.serve(async (request: Request) => {
         if (!providerReference) {
           missingProviderReference++;
           statusUnavailable++;
+          console.warn("DataHub status check skipped because the order has no provider reference", {
+            orderReference: order.delivery_reference,
+          });
           continue;
         }
         const lookup = new URL("https://user.datahubgh.com/api/external/order-status");
@@ -124,12 +127,20 @@ Deno.serve(async (request: Request) => {
         const payload = await response.json().catch(() => null);
         if (!response.ok || payload?.success === false || payload?.status === false) {
           lookupErrors++;
+          console.warn("DataHub status lookup was not confirmed", {
+            providerReference,
+            httpStatus: response.status,
+          });
           continue;
         }
         const status = extractDataHubStatus(payload);
         const resolvedReference = dataHubOrderReference(payload) ?? providerReference;
         if (!status) {
           statusUnavailable++;
+          console.warn("DataHub returned no recognized delivery status", {
+            providerReference,
+            httpStatus: response.status,
+          });
           continue;
         }
         if (status === order.delivery_status && resolvedReference === providerReference) continue;
@@ -140,6 +151,10 @@ Deno.serve(async (request: Request) => {
         });
         if (updateError) {
           updateErrors++;
+          console.error("Could not save DataHub status lookup", {
+            providerReference,
+            error: updateError.message,
+          });
           continue;
         }
         if (status === "failed" && String(order.payment_reference ?? "").startsWith("WALLET-")) {
@@ -147,8 +162,12 @@ Deno.serve(async (request: Request) => {
           if (refundError) updateErrors++;
         }
         updated++;
-      } catch {
+      } catch (error) {
         lookupErrors++;
+        console.error("DataHub status request failed", {
+          providerReference: String(order.provider_transaction_id ?? "").trim() || null,
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        });
       } finally {
         await service.from("orders").update({ last_provider_status_checked_at: new Date().toISOString() }).eq("id", order.id);
       }

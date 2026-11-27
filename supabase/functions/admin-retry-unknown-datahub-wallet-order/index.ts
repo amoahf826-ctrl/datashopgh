@@ -97,8 +97,8 @@ Deno.serve(async (request) => {
         continue;
       }
       if (typeof providerReference !== "string" || !providerReference.trim()) {
-        await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "unknown" });
-        outcomes.push({ order_id: orderId, success: true, delivery_status: "unknown", message: "DataHub accepted the request but returned no transaction reference; check the DataHub dashboard before further action." });
+        await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "processing" });
+        outcomes.push({ order_id: orderId, success: true, delivery_status: "processing", message: "DataHub accepted the request but returned no transaction reference; reconcile it in the DataHub dashboard before any further attempt." });
         continue;
       }
       const deliveryStatus = statusOf(data.status ?? data.delivery_status ?? data.orderStatus ?? data.order_status) ?? "processing";

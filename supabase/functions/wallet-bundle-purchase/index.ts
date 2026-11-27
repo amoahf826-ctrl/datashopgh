@@ -323,7 +323,7 @@ Deno.serve(async (request: Request) => {
       return json(200, { success: true, ...order, delivery_status: "failed", wallet_balance: refund?.wallet_balance ?? order.wallet_balance,
         message: refundError ? "The order was rejected. Contact support to reconcile your wallet." : `The order was rejected${reason ? `: ${reason}` : ""}. Your wallet has been refunded.` });
     }
-    if (delivery.ok && accepted && (activeProvider === "hubnet" || typeof providerResponseReference === "string")) {
+    if (delivery.ok && accepted) {
       if (providerStatus === "failed") {
         // Hubnet's purchase response can report a transient/ambiguous status.
         // Confirm it against the transaction-status endpoint before refunding;
@@ -354,7 +354,9 @@ Deno.serve(async (request: Request) => {
           ...(unverifiedNumber ? { verification_status: "unverified" } : {}),
           message: refundError ? "The provider reported a failed delivery. Contact support to reconcile your wallet." : `Delivery failed${providerReason ? `: ${providerReason}` : ""}. Your wallet has been refunded.` });
       }
-      const deliveryStatus = providerStatus ?? "unknown";
+      // A positive provider acknowledgement means the order is in progress,
+      // even when the provider omits its transaction ID or final status.
+      const deliveryStatus = providerStatus ?? "processing";
       await service.rpc("update_live_order_delivery", {
         p_reference: deliveryReference, p_delivery_status: deliveryStatus,
         p_provider_transaction_id: providerTransactionReference,
@@ -379,12 +381,33 @@ Deno.serve(async (request: Request) => {
         message: refundError ? "The provider rejected delivery. Contact support to reconcile your wallet." : `Delivery was rejected${String(result?.message ?? result?.error ?? "").replace(/[<>\r\n]+/g, " ").trim() ? `: ${String(result?.message ?? result?.error).replace(/[<>\r\n]+/g, " ").trim().slice(0, 180)}` : ""}. Your wallet has been refunded.` });
     }
 
-    await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "unknown" });
+    console.error("Provider returned an ambiguous delivery response", {
+      provider: activeProvider,
+      reference: deliveryReference,
+      httpStatus: delivery.status,
+      accepted,
+      hasProviderReference: typeof providerResponseReference === "string",
+      hasProviderStatus: providerStatus !== null,
+    });
+    await service.rpc("update_live_order_delivery", {
+      p_reference: deliveryReference,
+      p_delivery_status: "unknown",
+      p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(deliveryReference) : null,
+    });
     return json(200, { success: true, ...order, delivery_status: "unknown",
       message: "Order status is being checked. Please do not submit it again." });
-  } catch {
+  } catch (error) {
     // The provider may have accepted the request before a network timeout. Never auto-refund an uncertain delivery.
-    await service.rpc("update_live_order_delivery", { p_reference: deliveryReference, p_delivery_status: "unknown" });
+    console.error("Provider delivery request failed ambiguously", {
+      provider: activeProvider,
+      reference: deliveryReference,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    await service.rpc("update_live_order_delivery", {
+      p_reference: deliveryReference,
+      p_delivery_status: "unknown",
+      p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(deliveryReference) : null,
+    });
     return json(200, { success: true, ...order, delivery_status: "unknown",
       message: "Order status is being checked. Please do not submit it again." });
   }

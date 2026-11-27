@@ -292,24 +292,49 @@ Deno.serve(async (request: Request) => {
         p_delivery_status: "failed",
         p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null,
       });
-    } else if (delivery.ok && accepted && (providerStatus === "failed" || activeProvider === "hubnet" || typeof providerReference === "string")) {
+    } else if (delivery.ok && accepted) {
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,
-        p_delivery_status: providerStatus ?? "unknown",
+        p_delivery_status: providerStatus ?? "processing",
         p_provider_transaction_id: typeof providerReference === "string" ? providerReference : (activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null),
       });
     } else if (delivery.ok && result?.success === true) {
-      await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "unknown" });
+      await service.rpc("update_live_order_delivery", {
+        p_reference: claim.delivery_reference,
+        p_delivery_status: "unknown",
+        p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null,
+      });
     } else if (delivery.status >= 400 && delivery.status < 500) {
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference, p_delivery_status: "failed",
       });
     } else {
-      await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "unknown" });
+      console.error("Provider returned an ambiguous paid-delivery response", {
+        provider: activeProvider,
+        reference: claim.delivery_reference,
+        httpStatus: delivery.status,
+        accepted,
+        hasProviderReference: typeof providerReference === "string",
+        hasProviderStatus: providerStatus !== null,
+      });
+      await service.rpc("update_live_order_delivery", {
+        p_reference: claim.delivery_reference,
+        p_delivery_status: "unknown",
+        p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null,
+      });
     }
-  } catch {
+  } catch (error) {
     // A timeout can happen after Hubnet accepted the request. Keep it unknown to prevent accidental duplicate delivery.
-    await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "unknown" });
+    console.error("Provider paid-delivery request failed ambiguously", {
+      provider: activeProvider,
+      reference: claim.delivery_reference,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    await service.rpc("update_live_order_delivery", {
+      p_reference: claim.delivery_reference,
+      p_delivery_status: "unknown",
+      p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null,
+    });
   }
   return response(200, { received: true });
 });

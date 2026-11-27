@@ -77,7 +77,7 @@ Deno.serve(async (request: Request) => {
   const service = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: profile } = await service.from("profiles").select("role").eq("id", authData.user.id).maybeSingle();
   let ordersQuery = service.from("orders")
-    .select("id,delivery_reference,payment_reference,delivery_status,last_provider_status_checked_at")
+    .select("id,delivery_reference,payment_reference,delivery_status,provider_transaction_id,last_provider_status_checked_at")
     .eq("is_demo", false).eq("payment_status", "successful").eq("delivery_provider", "hubnet")
     .in("delivery_status", ["queued", "processing", "unknown"])
     .order("last_provider_status_checked_at", { ascending: true, nullsFirst: true }).limit(40);
@@ -87,6 +87,9 @@ Deno.serve(async (request: Request) => {
 
   const authHeader = /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
   let updated = 0;
+  let lookupErrors = 0;
+  let statusUnavailable = 0;
+  let updateErrors = 0;
   const queue = [...(orders ?? [])];
   const workers = Array.from({ length: Math.min(8, queue.length) }, async () => {
    while (queue.length) {
@@ -107,30 +110,68 @@ Deno.serve(async (request: Request) => {
         const candidateEnvelope = payload?.response ?? payload;
         if (response.ok && (candidateEnvelope?.status === true || candidateEnvelope?.status === "success" || payload?.status === true || payload?.status === "success")) break;
       }
-      if (!response) return;
+      if (!response) {
+        lookupErrors++;
+        return;
+      }
       const envelope = payload?.response ?? payload;
       const confirmed = envelope?.status === true || envelope?.status === "success" ||
         payload?.status === true || payload?.status === "success";
-      if (!response.ok || !confirmed) return;
+      if (!response.ok || !confirmed) {
+        lookupErrors++;
+        console.warn("Hubnet status lookup was not confirmed", {
+          reference: hubnetReference(order.delivery_reference),
+          httpStatus: response.status,
+        });
+        return;
+      }
       const deliveryStatus = extractStatus(payload);
-      if (!deliveryStatus) return;
-      if (deliveryStatus === order.delivery_status) return;
+      if (!deliveryStatus) {
+        statusUnavailable++;
+        console.warn("Hubnet returned no recognized delivery status", {
+          reference: hubnetReference(order.delivery_reference),
+        });
+        return;
+      }
+      const savedReference = String(order.provider_transaction_id ?? "").trim();
+      const fallbackReference = savedReference && savedReference !== order.delivery_reference
+        ? savedReference
+        : hubnetReference(order.delivery_reference);
+      const returnedReference = [envelope?.transaction_id, envelope?.tracking_id]
+        .find((value) => typeof value === "string" || typeof value === "number");
+      const resolvedReference = returnedReference === undefined
+        ? fallbackReference
+        : String(returnedReference).trim() || fallbackReference;
+      if (deliveryStatus === order.delivery_status && resolvedReference === savedReference) return;
       const { error: updateError } = await service.rpc("update_live_order_delivery", {
         p_reference: order.delivery_reference,
         p_delivery_status: deliveryStatus,
-        p_provider_transaction_id: envelope?.transaction_id ?? envelope?.tracking_id ?? null,
+        p_provider_transaction_id: resolvedReference,
       });
-      if (updateError) return;
+      if (updateError) {
+        updateErrors++;
+        console.error("Could not save Hubnet status lookup", {
+          reference: hubnetReference(order.delivery_reference),
+          error: updateError.message,
+        });
+        return;
+      }
       if (deliveryStatus === "failed" && String(order.payment_reference ?? "").startsWith("WALLET-")) {
         await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: order.delivery_reference });
       }
       updated++;
-    } catch { /* Leave an unresolved order untouched; a later refresh can check again. */ }
+    } catch (error) {
+      lookupErrors++;
+      console.error("Hubnet status request failed", {
+        reference: hubnetReference(order.delivery_reference),
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    }
     finally {
       await service.from("orders").update({ last_provider_status_checked_at: new Date().toISOString() }).eq("id", order.id);
     }
    }
   });
   await Promise.all(workers);
-  return json(200, { success: true, checked: orders?.length ?? 0, updated });
+  return json(200, { success: true, checked: orders?.length ?? 0, updated, lookup_errors: lookupErrors, status_unavailable: statusUnavailable, update_errors: updateErrors });
 });

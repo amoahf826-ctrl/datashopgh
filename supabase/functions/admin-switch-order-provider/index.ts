@@ -33,15 +33,15 @@ Deno.serve(async(request)=>{
     }
     const raw=await response.json().catch(()=>null),envelope=provider==="hubnet"?(raw?.response??raw):raw,data=envelope?.data??raw?.data??{},accepted=provider==="hubnet"?(envelope?.status===true||envelope?.status==="success"||raw?.success===true||raw?.status==="success"):raw?.success===true;
     const providerReference=provider==="datahub"?dataHubOrderReference(raw):data.reference??data.transaction_id??data.tracking_id??data.transactionReference;
-    if(response.ok&&accepted&&(provider==="hubnet"||typeof providerReference==="string")){
+    if(response.ok&&accepted){
       const status=normalize(data.status??data.delivery_status??data.orderStatus??data.order_status)??"processing";
       const {error}=await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:status,p_provider_transaction_id:typeof providerReference==="string"?providerReference:(provider==="hubnet"?hubnetReference(order.reference):null)});
       if(error)return reply(500,{error:"Provider accepted the retry, but order status could not be saved. Check the order status before retrying again."});
       return reply(200,{success:true,delivery_status:status});
     }
     if(response.status>=400&&response.status<500){await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"failed"});return reply(502,{error:String(raw?.message??raw?.error??"The alternate provider rejected the retry." )})}
-    await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"unknown"});return reply(202,{success:true,delivery_status:"unknown",message:"Provider response is uncertain. Check order status before taking action."});
+    await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"unknown",p_provider_transaction_id:provider==="hubnet"?hubnetReference(order.reference):null});return reply(202,{success:true,delivery_status:"unknown",message:"Provider response is uncertain. Check order status before taking action."});
   }catch{
-    await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"unknown"});return reply(202,{success:true,delivery_status:"unknown",message:"Provider response is uncertain. Check order status before retrying."});
+    await service.rpc("update_live_order_delivery",{p_reference:order.reference,p_delivery_status:"unknown",p_provider_transaction_id:provider==="hubnet"?hubnetReference(order.reference):null});return reply(202,{success:true,delivery_status:"unknown",message:"Provider response is uncertain. Check order status before retrying."});
   }
 });

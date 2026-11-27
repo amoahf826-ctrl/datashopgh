@@ -91,7 +91,7 @@ Deno.serve(async (request: Request) => {
     const { error } = await service.rpc("update_live_order_delivery", {
       p_reference: internalReference,
       p_delivery_status: deliveryStatus,
-      p_provider_transaction_id: envelope?.transaction_id ?? envelope?.data?.transaction_id ?? null,
+      p_provider_transaction_id: envelope?.transaction_id ?? envelope?.data?.transaction_id ?? hubnetReference(internalReference),
     });
     if (error) return json(500, { error: "Verified status could not be saved." });
     if (deliveryStatus === "failed") {
