@@ -260,17 +260,19 @@ Deno.serve(async (request: Request) => {
   });
   if (claimError) return response(500, { error: "Verified payment could not be reconciled." });
   if (!claim?.newly_paid) return response(200, { received: true, duplicate: true });
-  const failAndRefundAmbiguousOrder = async () => {
+  const failAndRefundPaidOrder = async (reason: "ambiguous" | "rejected" | "invalid_plan", providerReference?: unknown) => {
     await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "failed",
-      p_provider_transaction_id: activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null });
+      p_provider_transaction_id: typeof providerReference === "string" && providerReference.trim()
+        ? providerReference.trim()
+        : activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null });
     const refundQueued = await requestOrderRefund(secret, reference, claim.order_id, verification.data.amount);
-    if (!refundQueued) console.error("Paystack refund request could not be confirmed", { orderId: claim.order_id });
+    if (!refundQueued) console.error("Paystack refund request could not be confirmed", { orderId: claim.order_id, reason });
     return refundQueued;
   };
   await service.from("orders").update({ delivery_provider: activeProvider }).eq("id", claim.order_id);
   const size = String(claim.size ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i);
   if (!networkKey || !size) {
-    await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "failed" });
+    await failAndRefundPaidOrder("invalid_plan");
     return response(200, { received: true, delivered: false });
   }
   const capacity = String(Number((Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1 : 0.001)).toFixed(3)));
@@ -309,11 +311,9 @@ Deno.serve(async (request: Request) => {
       const reason = String(envelope?.message ?? result?.message ?? result?.error ?? resultData?.message ?? "")
         .replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
       console.error(`${activeProvider} rejected paid delivery`, { reference: claim.delivery_reference, networkKey, httpStatus: delivery.status, reason });
-      await service.rpc("update_live_order_delivery", {
-        p_reference: claim.delivery_reference,
-        p_delivery_status: "failed",
-        p_provider_transaction_id: typeof providerReference === "string" ? providerReference : null,
-      });
+      await failAndRefundPaidOrder("rejected", providerReference);
+    } else if (delivery.ok && accepted && providerStatus === "failed") {
+      await failAndRefundPaidOrder("rejected", providerReference);
     } else if (delivery.ok && accepted) {
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,
@@ -321,11 +321,9 @@ Deno.serve(async (request: Request) => {
         p_provider_transaction_id: typeof providerReference === "string" ? providerReference : (activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null),
       });
     } else if (delivery.ok && result?.success === true) {
-      await failAndRefundAmbiguousOrder();
+      await failAndRefundPaidOrder("ambiguous");
     } else if (delivery.status >= 400 && delivery.status < 500) {
-      await service.rpc("update_live_order_delivery", {
-        p_reference: claim.delivery_reference, p_delivery_status: "failed",
-      });
+      await failAndRefundPaidOrder("rejected");
     } else {
       console.error("Provider returned an ambiguous paid-delivery response", {
         provider: activeProvider,
@@ -335,7 +333,7 @@ Deno.serve(async (request: Request) => {
         hasProviderReference: typeof providerReference === "string",
         hasProviderStatus: providerStatus !== null,
       });
-      await failAndRefundAmbiguousOrder();
+      await failAndRefundPaidOrder("ambiguous");
     }
   } catch (error) {
     // Ambiguous purchase outcomes follow the configured fail-and-refund policy.
@@ -344,7 +342,7 @@ Deno.serve(async (request: Request) => {
       reference: claim.delivery_reference,
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
-    await failAndRefundAmbiguousOrder();
+    await failAndRefundPaidOrder("ambiguous");
   }
   return response(200, { received: true });
 });

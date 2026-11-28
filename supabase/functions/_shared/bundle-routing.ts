@@ -23,9 +23,20 @@ export function resolveBundleRoute(
   const providerTypes = provider === "hubnet"
     ? new Set(["mtn-new-transaction", "telecel-new-transaction", "at-new-transaction", "big-time-new-transaction"])
     : new Set(["YELLO", "mtn_xpress", "TELECEL", "AT_PREMIUM", "AT_BIGTIME"]);
-  // A plan can retain a network type from its previous delivery provider.
-  // Never send an endpoint key from one provider to the other provider's API.
-  const networkType = configuredType && providerTypes.has(configuredType)
+  const normalizedNetwork = plan.network.trim().toLowerCase();
+  const networkTypes = normalizedNetwork === "mtn"
+    ? new Set(provider === "hubnet" ? ["mtn-new-transaction"] : ["YELLO", "mtn_xpress"])
+    : normalizedNetwork === "telecel"
+      ? new Set(provider === "hubnet" ? ["telecel-new-transaction"] : ["TELECEL"])
+      : normalizedNetwork === "at"
+        ? new Set(provider === "hubnet"
+          ? ["at-new-transaction", "big-time-new-transaction"]
+          : ["AT_PREMIUM", "AT_BIGTIME"])
+        : new Set<string>();
+  // Reject mappings from another provider or network family. A plan can retain
+  // stale metadata after its provider changes, and a bad manual mapping must
+  // never send Telecel to AirtelTigo/Tigo or the reverse.
+  const networkType = configuredType && providerTypes.has(configuredType) && networkTypes.has(configuredType)
     ? configuredType
     : defaultNetworkType(provider, plan.network, plan.category ?? "", plan.subcategory ?? "", plan.size ?? "");
   return { provider, networkType };
