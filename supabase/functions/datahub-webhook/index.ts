@@ -134,12 +134,5 @@ Deno.serve(async (request: Request) => {
   });
   if (updateError) return reply(500, { error: "Could not save the provider status." });
 
-  if (deliveryStatus === "failed" && String(order.payment_reference ?? "").startsWith("WALLET-")) {
-    const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", {
-      p_delivery_reference: order.delivery_reference,
-    });
-    if (refundError) return reply(500, { error: "Failure saved but the wallet refund needs reconciliation." });
-  }
-
   return reply(200, { received: true, updated: true });
 });

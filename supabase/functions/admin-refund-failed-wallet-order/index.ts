@@ -8,6 +8,15 @@ const headers = {
 };
 const json = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers });
+function readSecret(legacy: string, collection: string): string | undefined {
+  const direct = Deno.env.get(legacy)?.trim();
+  if (direct) return direct;
+  try {
+    const values = JSON.parse(Deno.env.get(collection) ?? "{}") as Record<string, unknown>;
+    if (typeof values.default === "string") return values.default;
+    return Object.values(values).find((value): value is string => typeof value === "string");
+  } catch { return undefined; }
+}
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers });
@@ -16,9 +25,9 @@ Deno.serve(async (request) => {
   if (!authorization?.startsWith("Bearer ")) return json(401, { error: "Administrator sign-in required." });
 
   const url = Deno.env.get("SUPABASE_URL");
-  const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY");
-  if (!url || !anon || !serviceKey) return json(503, { error: "Wallet refund service is not configured." });
+  const anon = readSecret("SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEYS");
+  const serviceKey = readSecret("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS");
+  if (!url || !anon || !serviceKey) return json(503, { error: "Order refund service is not configured." });
 
   const auth = createClient(url, anon, { global: { headers: { Authorization: authorization } } });
   const { data: authData, error: authError } = await auth.auth.getUser();
@@ -34,29 +43,72 @@ Deno.serve(async (request) => {
 
   const service = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: order, error: orderError } = await service.from("orders")
-    .select("id,user_id,payment_reference,delivery_reference,payment_status,delivery_status,status,is_demo")
+    .select("id,user_id,payment_reference,delivery_reference,payment_status,delivery_status,status,is_demo,price,charge_amount")
     .eq("id", body.order_id).maybeSingle();
   if (orderError) return json(500, { error: "Could not load the selected order." });
   if (!order || order.is_demo || order.payment_status !== "successful" ||
-      order.delivery_status !== "failed" || order.status !== "failed") {
-    return json(409, { error: "Only paid orders with a confirmed failed delivery can be wallet-refunded." });
+      !["failed", "unknown"].includes(String(order.delivery_status)) || !["failed", "processing"].includes(String(order.status))) {
+    return json(409, { error: "Only paid failed or unresolved orders can be refunded after administrator review." });
   }
-  if (!String(order.payment_reference ?? "").startsWith("WALLET-") || !order.user_id) {
-    return json(409, { error: "This order was not paid from an account wallet; there is no wallet balance to refund." });
+  const paymentReference = String(order.payment_reference ?? "");
+  const method = paymentReference.startsWith("WALLET-") ? "wallet" : "paystack";
+  if (method === "wallet" && !order.user_id) return json(409, { error: "The wallet-funded order has no wallet owner." });
+  const { data: existingRefund, error: historyError } = await service.from("order_refunds")
+    .select("id,status,method,provider_reference").eq("order_id", order.id).maybeSingle();
+  if (historyError) return json(503, { error: "Apply migration 202611280001_admin_issued_order_refunds.sql before issuing refunds." });
+  if (existingRefund) return json(409, { error: `A ${existingRefund.status} refund record already exists for this order. Review it before taking another action.` });
+
+  const amount = method === "paystack" ? Number(order.charge_amount ?? order.price) : Number(order.price);
+  if (!Number.isFinite(amount) || amount <= 0) return json(409, { error: "The refundable order amount is invalid." });
+  const refundReference = method === "paystack" ? `ORDREF-${String(order.id).replaceAll("-", "")}` : null;
+  const { data: reservation, error: reserveError } = await service.from("order_refunds").insert({
+    order_id: order.id, method, status: "processing", amount, provider_reference: refundReference, issued_by: authData.user.id,
+    provider_message: "Refund explicitly initiated by an administrator.",
+  }).select("id").single();
+  if (reserveError || !reservation) return json(409, { error: "A refund has already been started or its status needs review." });
+
+  if (method === "wallet") {
+    const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", {
+      p_delivery_reference: order.delivery_reference,
+    });
+    if (refundError || refund?.refunded !== true) {
+      await service.from("order_refunds").update({ status: "failed", provider_message: "Admin wallet refund failed; review the wallet ledger." }).eq("id", reservation.id);
+      console.error("Admin wallet refund failed.", { orderId: order.id, code: refundError?.code });
+      return json(500, { error: "Wallet refund could not be posted. Review the order and wallet ledger." });
+    }
+    await service.from("order_refunds").update({ status: "completed", provider_message: "Wallet credit posted by administrator." }).eq("id", reservation.id);
+    return json(200, { success: true, refunded: true, method, order_id: order.id, wallet_balance: refund.wallet_balance });
   }
 
-  const { data: existingRefund, error: ledgerError } = await service.from("ledger")
-    .select("id").eq("reference_type", "order").eq("reference_id", order.id).eq("kind", "refund").maybeSingle();
-  if (ledgerError) return json(500, { error: "Could not verify the order's refund history." });
-  if (existingRefund) return json(409, { error: "This order already has a wallet refund entry." });
-
-  const { data: refund, error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", {
-    p_delivery_reference: order.delivery_reference,
-  });
-  if (refundError) {
-    console.error("Failed order wallet refund needs review.", { orderId: order.id, code: refundError.code });
-    return json(500, { error: "Wallet refund could not be posted. Review this order and its ledger." });
+  const paystackSecret = readSecret("PAYSTACK_SECRET_KEY", "PAYSTACK_SECRET_KEYS");
+  if (!paystackSecret || !paymentReference) {
+    await service.from("order_refunds").update({ status: "failed", provider_message: "Paystack refund secret or payment reference is not configured." }).eq("id", reservation.id);
+    return json(503, { error: "Paystack refund is not configured on the server." });
   }
-  if (refund?.refunded !== true) return json(409, { error: "The order was not refunded. Review its refund state before retrying." });
-  return json(200, { success: true, refunded: true, order_id: order.id, wallet_balance: refund.wallet_balance });
+  try {
+    const response = await fetch("https://api.paystack.co/refund", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${paystackSecret}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ transaction: paymentReference, amount: Math.round(amount * 100), currency: "GHS", reference: refundReference,
+        customer_note: "Refund issued by CheapDataBundle administrator.", merchant_note: `Admin-issued refund for order ${order.id}` }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.status !== true) {
+      await service.from("order_refunds").update({ status: "failed", provider_message: String(result?.message ?? "Paystack did not accept the refund request.").slice(0, 300) }).eq("id", reservation.id);
+      return json(502, { error: "Paystack did not accept the refund request. Review the payment in Paystack before trying again." });
+    }
+    const paystackStatus = String(result?.data?.status ?? "pending").toLowerCase();
+    const completed = ["processed", "success", "successful", "completed"].includes(paystackStatus);
+    await service.from("order_refunds").update({ status: completed ? "completed" : "processing",
+      provider_message: `Paystack accepted the administrator refund request (${paystackStatus || "pending"}).` }).eq("id", reservation.id);
+    await service.from("audit_log").insert({ actor_id: authData.user.id, action: "admin_order_refund_issued", entity: "order", entity_id: order.id,
+      details: { method, amount, paystack_reference: refundReference, paystack_status: paystackStatus || "pending" } });
+    return json(200, { success: true, refunded: completed, refund_status: completed ? "completed" : "processing", method, order_id: order.id, reference: refundReference });
+  } catch {
+    // The external outcome may be uncertain. Keep the unique reservation so a second click cannot double-refund.
+    await service.from("order_refunds").update({ status: "processing", provider_message: "Paystack refund outcome is unconfirmed; reconcile in Paystack before retrying." }).eq("id", reservation.id);
+    return json(202, { success: true, refunded: false, refund_status: "processing", method, order_id: order.id, reference: refundReference,
+      message: "Paystack refund outcome is being reconciled. Do not submit another refund request." });
+  }
 });

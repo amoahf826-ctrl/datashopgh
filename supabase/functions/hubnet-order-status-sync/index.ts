@@ -173,9 +173,6 @@ Deno.serve(async (request: Request) => {
         });
         return;
       }
-      if (deliveryStatus === "failed" && String(order.payment_reference ?? "").startsWith("WALLET-")) {
-        await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: order.delivery_reference });
-      }
       updated++;
     } catch (error) {
       lookupErrors++;

@@ -94,12 +94,6 @@ Deno.serve(async (request: Request) => {
       p_provider_transaction_id: envelope?.transaction_id ?? envelope?.data?.transaction_id ?? hubnetReference(internalReference),
     });
     if (error) return json(500, { error: "Verified status could not be saved." });
-    if (deliveryStatus === "failed") {
-      const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", {
-        p_delivery_reference: internalReference,
-      });
-      if (refundError) return json(500, { error: "Verified delivery failure was saved, but wallet refund needs reconciliation." });
-    }
     return json(200, { received: true, verified: true });
   } catch {
     return json(500, { error: "Could not verify provider status." });

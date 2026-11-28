@@ -81,11 +81,8 @@ Deno.serve(async (request) => {
         const definiteRejection = response.status >= 400 && response.status < 500 || payload?.success === false || payload?.status === false ||
           ["failed", "failure", "rejected", "error"].includes(responseStatus);
         if (!definiteRejection) {
-          await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "failed" });
-          const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
-          outcomes.push({ order_id: orderId, success: false, delivery_status: "failed", message: refundError
-            ? "DataHub response was ambiguous. Contact support to reconcile the wallet refund."
-            : "DataHub response was ambiguous. The wallet was refunded." });
+          await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "unknown" });
+          outcomes.push({ order_id: orderId, success: false, delivery_status: "unknown", message: "DataHub response was ambiguous. No refund was issued; administrator review is required." });
           continue;
         }
         const { error: statusError } = await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "failed",
@@ -94,9 +91,8 @@ Deno.serve(async (request) => {
           outcomes.push({ order_id: orderId, success: false, error: "DataHub rejected the retry, but its failed status could not be saved. Reconcile this order before taking another action." });
           continue;
         }
-        const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
         outcomes.push({ order_id: orderId, success: false, delivery_status: "failed",
-          message: refundError ? "DataHub rejected the order; automatic wallet refund needs admin review." : "DataHub rejected the retry and the wallet debit was refunded." });
+          message: "DataHub rejected the retry. No refund was issued; use the explicit admin refund action after review." });
         continue;
       }
       if (typeof providerReference !== "string" || !providerReference.trim()) {
@@ -112,19 +108,15 @@ Deno.serve(async (request) => {
         continue;
       }
       if (deliveryStatus === "failed") {
-        const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
         outcomes.push({ order_id: orderId, success: false, delivery_status: "failed",
-          message: refundError ? "Provider reported failure; automatic refund needs admin review." : "DataHub reported failure and the wallet debit was refunded." });
+          message: "DataHub reported failure. No refund was issued; use the explicit admin refund action after review." });
       } else {
         outcomes.push({ order_id: orderId, success: true, delivery_status: deliveryStatus, provider_reference: providerReference });
       }
     } catch (error) {
-      await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "failed" });
-      const { error: refundError } = await service.rpc("refund_failed_wallet_bundle_order", { p_delivery_reference: newReference });
+      await service.rpc("update_live_order_delivery", { p_reference: newReference, p_delivery_status: "unknown" });
       console.error("Admin DataHub retry ambiguous", { orderId, error: String(error) });
-      outcomes.push({ order_id: orderId, success: false, delivery_status: "failed", message: refundError
-        ? "The provider request timed out. Contact support to reconcile the wallet refund."
-        : "The provider request timed out. The wallet was refunded." });
+      outcomes.push({ order_id: orderId, success: false, delivery_status: "unknown", message: "The provider request timed out. No refund was issued; administrator review is required." });
     }
   }
   return json(200, { success: outcomes.every((result) => result.success), results: outcomes });

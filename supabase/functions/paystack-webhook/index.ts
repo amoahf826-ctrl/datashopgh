@@ -40,21 +40,6 @@ function readSupabaseServiceKey(): string | undefined {
   } catch { return undefined; }
 }
 
-async function requestOrderRefund(secret: string, reference: string, orderId: string, amount: number) {
-  const refundReference = `ORDREF-${orderId.replaceAll("-", "")}`;
-  try {
-    const refundResponse = await fetch("https://api.paystack.co/refund", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ transaction: reference, amount, currency: "GHS", reference: refundReference,
-        customer_note: "Refund for uncertain data bundle delivery", merchant_note: `Ambiguous provider delivery for order ${orderId}` }),
-      signal: AbortSignal.timeout(15000),
-    });
-    const result = await refundResponse.json().catch(() => null);
-    return refundResponse.ok && result?.status === true;
-  } catch { return false; }
-}
-
 async function validSignature(raw: string, signature: string, secret: string): Promise<boolean> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
@@ -149,20 +134,7 @@ Deno.serve(async (request: Request) => {
       return response(200, { received: true, resultChecker: "completed" });
     }
     if (purchased.definite) {
-      const refundReference = `RCREF-${checker.id.replaceAll("-", "")}`;
-      try {
-        const refundResponse = await fetch("https://api.paystack.co/refund", { method: "POST",
-          headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ transaction: reference, amount: verification.data.amount, currency: "GHS", reference: refundReference,
-            customer_note: "Refund for unavailable result checker voucher", merchant_note: `DataHub rejected checker order ${reference}` }),
-          signal: AbortSignal.timeout(15000) });
-        const refund = await refundResponse.json().catch(() => null);
-        if (refundResponse.ok && refund?.status === true) {
-          await service.from("result_checker_orders").update({ status: "failed", refund_status: "pending", provider_message: `${purchased.message} Refund queued with Paystack.`, updated_at: new Date().toISOString() }).eq("id", checker.id);
-          return response(200, { received: true, resultChecker: "refunded", refund_status: "pending" });
-        }
-      } catch { /* Fall through to manual reconciliation if Paystack's refund response is uncertain. */ }
-      await service.from("result_checker_orders").update({ status: "needs_review", refund_status: "failed", provider_message: `${purchased.message} Automatic Paystack refund could not be confirmed. Admin review required.`, updated_at: new Date().toISOString() }).eq("id", checker.id);
+      await service.from("result_checker_orders").update({ status: "needs_review", refund_status: "none", provider_message: `${purchased.message} No refund was issued automatically. Administrator review is required.`, updated_at: new Date().toISOString() }).eq("id", checker.id);
       return response(200, { received: true, resultChecker: "needs_review" });
     }
     await service.from("result_checker_orders").update({ status: "needs_review", provider_message: purchased.message, updated_at: new Date().toISOString() }).eq("id", checker.id);
@@ -260,19 +232,17 @@ Deno.serve(async (request: Request) => {
   });
   if (claimError) return response(500, { error: "Verified payment could not be reconciled." });
   if (!claim?.newly_paid) return response(200, { received: true, duplicate: true });
-  const failAndRefundPaidOrder = async (reason: "ambiguous" | "rejected" | "invalid_plan", providerReference?: unknown) => {
+  const markPaidOrderFailed = async (reason: "ambiguous" | "rejected" | "invalid_plan", providerReference?: unknown) => {
     await service.rpc("update_live_order_delivery", { p_reference: claim.delivery_reference, p_delivery_status: "failed",
       p_provider_transaction_id: typeof providerReference === "string" && providerReference.trim()
         ? providerReference.trim()
         : activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null });
-    const refundQueued = await requestOrderRefund(secret, reference, claim.order_id, verification.data.amount);
-    if (!refundQueued) console.error("Paystack refund request could not be confirmed", { orderId: claim.order_id, reason });
-    return refundQueued;
+    console.warn("Paid order needs administrator review; no automatic refund was issued.", { orderId: claim.order_id, reason });
   };
   await service.from("orders").update({ delivery_provider: activeProvider }).eq("id", claim.order_id);
   const size = String(claim.size ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*(GB|MB)$/i);
   if (!networkKey || !size) {
-    await failAndRefundPaidOrder("invalid_plan");
+    await markPaidOrderFailed("invalid_plan");
     return response(200, { received: true, delivered: false });
   }
   const capacity = String(Number((Number(size[1]) * (size[2].toUpperCase() === "GB" ? 1 : 0.001)).toFixed(3)));
@@ -311,9 +281,9 @@ Deno.serve(async (request: Request) => {
       const reason = String(envelope?.message ?? result?.message ?? result?.error ?? resultData?.message ?? "")
         .replace(/[<>\r\n]+/g, " ").trim().slice(0, 180);
       console.error(`${activeProvider} rejected paid delivery`, { reference: claim.delivery_reference, networkKey, httpStatus: delivery.status, reason });
-      await failAndRefundPaidOrder("rejected", providerReference);
+      await markPaidOrderFailed("rejected", providerReference);
     } else if (delivery.ok && accepted && providerStatus === "failed") {
-      await failAndRefundPaidOrder("rejected", providerReference);
+      await markPaidOrderFailed("rejected", providerReference);
     } else if (delivery.ok && accepted) {
       await service.rpc("update_live_order_delivery", {
         p_reference: claim.delivery_reference,
@@ -321,9 +291,9 @@ Deno.serve(async (request: Request) => {
         p_provider_transaction_id: typeof providerReference === "string" ? providerReference : (activeProvider === "hubnet" ? hubnetReference(claim.delivery_reference) : null),
       });
     } else if (delivery.ok && result?.success === true) {
-      await failAndRefundPaidOrder("ambiguous");
+      await markPaidOrderFailed("ambiguous");
     } else if (delivery.status >= 400 && delivery.status < 500) {
-      await failAndRefundPaidOrder("rejected");
+      await markPaidOrderFailed("rejected");
     } else {
       console.error("Provider returned an ambiguous paid-delivery response", {
         provider: activeProvider,
@@ -333,16 +303,16 @@ Deno.serve(async (request: Request) => {
         hasProviderReference: typeof providerReference === "string",
         hasProviderStatus: providerStatus !== null,
       });
-      await failAndRefundPaidOrder("ambiguous");
+      await markPaidOrderFailed("ambiguous");
     }
   } catch (error) {
-    // Ambiguous purchase outcomes follow the configured fail-and-refund policy.
+    // Ambiguous purchase outcomes require administrator review; no refund is automatic.
     console.error("Provider paid-delivery request failed ambiguously", {
       provider: activeProvider,
       reference: claim.delivery_reference,
       errorName: error instanceof Error ? error.name : "UnknownError",
     });
-    await failAndRefundPaidOrder("ambiguous");
+    await markPaidOrderFailed("ambiguous");
   }
   return response(200, { received: true });
 });
